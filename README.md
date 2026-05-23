@@ -155,20 +155,59 @@ A one-page CEO-printable recommendation document is at [docs/10_executive_recomm
 
 > **40 % ops fix → 35 % retention → 25 % upsell.** Sequencing protects margin first, then revenue, then growth.
 
-## Part 4 — Agentic AI / MCP ⏳
+## Part 4 — Agentic AI / MCP server ✅
 
-Pending. Will expose the marts + ontology + NLP through an MCP server. Tools:
-`get_route_kpis`, `list_at_risk_customers`, `list_premium_upsell_candidates`, `route_complaint_themes`, etc.
+**Status: 8 tools + 1 resource exposed via stdio MCP; 17/17 tests PASS; 5/5 grounded questions answered end-to-end via the protocol.**
 
-## Senior criteria — status after Part 3
+### Surface
+
+| | Count | What |
+|---|---|---|
+| **Tools** | 8 | 5 ontology concepts + 1 KPI summary + 1 NLP search + 1 compare_routes |
+| **Resources** | 1 | `glossary://airline-business` (4.7 KB Markdown) |
+| **Tests** | 17 | safety (5) + ontology (6) + others (6) — all PASS in ~1s |
+| **Smoke test** | 5 questions | All 3 brief acceptance questions + 2 bonuses answered via real MCP stdio |
+
+### Senior trade-off
+
+**Specialised tools, not a generic `run_sql`.** The LLM never writes SQL; it picks among 8 contract-bound tools, each with parameterised SQL we wrote, tested, and committed. Trade: more code on our side. Pay-off: explainability, auditability, and safety by construction. Every tool returns the SQL it executed (audit trail) and is capped at 1 000 rows.
+
+### Spin-up
+
+```bash
+# Prereqs: dbt/airline.duckdb already built (Part 2)
+.venv/Scripts/python -m mcp_server.smoke_test                       # 5/5 PASS
+.venv/Scripts/python -m pytest mcp_server/tests/                    # 17/17 PASS
+# Wire Claude Desktop: edit %APPDATA%/Claude/claude_desktop_config.json
+# with the block from mcp_server/claude_desktop_config.json (replace <PROJECT_ROOT>)
+```
+
+### Brief acceptance — covered end-to-end
+
+| Brief requirement | Where in the project |
+|---|---|
+| MCP server (or equivalent tool layer) | [mcp_server/](mcp_server/) (Python + FastMCP, stdio) |
+| AI assistant can use it | Claude Desktop config in [mcp_server/claude_desktop_config.json](mcp_server/claude_desktop_config.json) |
+| Structured data | Tools 1-6, 8 (ontology + KPI + compare) |
+| ≥ 1 unstructured source | Tool 7 `search_feedback_text` — returns raw FR/EN feedback text |
+| Grounded Q1 — *"Which routes deserve more budget?"* | `list_strategic_underperforming_routes` + `list_irops_heavy_routes` |
+| Grounded Q2 — *"Which high-value customers are at risk?"* | `list_high_value_at_risk_customers` |
+| Grounded Q3 — *"Complaints on route X?"* | `get_network_summary` + `search_feedback_text` |
+| Video + brief architecture | Script + diagram in [docs/12_video_walkthrough.md](docs/12_video_walkthrough.md) |
+
+Architecture deep-dive: [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md). Quick-start: [mcp_server/README.md](mcp_server/README.md).
+
+## Senior criteria — status after Part 4 (FINAL)
 
 | Brief criterion | Status |
 |---|---|
-| Deliberate modeling trade-offs | ✅ Star vs DV vs hybrid; SCD2 ciblé; Superset vs Streamlit |
-| Reusable semantic layer | ✅ 24 KPIs in `_metrics.yml`, consumed by every chart |
-| Ontology-inspired inference | ✅ 5 concepts feed the Decision Layer page directly |
-| Robust AI tooling | ⏳ Pending Part 4 |
-| Strong documentation | ✅ 10 docs in `/docs` + dbt docs site + dashboard design rationale |
+| Deliberate modeling trade-offs | ✅ Star vs DV vs hybrid; SCD2 ciblé; Superset vs Streamlit; specialised tools vs run_sql |
+| Reusable semantic layer | ✅ 24 KPIs in `_metrics.yml`, consumed by dashboard charts AND MCP tools |
+| Ontology-inspired inference | ✅ 5 concepts → 5 dashboard tables → 5 MCP tools (one path, consumed twice) |
+| **Robust AI tooling** | ✅ 8 specialised tools + Pydantic validation + read-only DB + 17 tests + E2E smoke |
+| Strong documentation | ✅ 12 docs in `/docs` + dbt docs site + dashboard + architecture + video script |
+
+**5/5 senior criteria validated. Project complete.**
 
 ## Decisions log
 
@@ -183,3 +222,5 @@ Pending. Will expose the marts + ontology + NLP through an MCP server. Tools:
 - `docs/08_nlp_pipeline.md` — NLP step-by-step + lexicons + limits
 - `docs/09_dashboard_design.md` — Superset/DuckDB stack, per-page rationale, 5 bugs fixed
 - `docs/10_executive_recommendations.md` — one-page CEO printable
+- `docs/11_mcp_architecture.md` — MCP server architecture + senior trade-offs
+- `docs/12_video_walkthrough.md` — video script + recording instructions
