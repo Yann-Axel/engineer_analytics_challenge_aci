@@ -24,15 +24,24 @@ bash bootstrap.sh
 
 Then open <http://localhost:8088> — login `admin / admin`.
 
-## Connect Superset to DuckDB
+## Connect Superset to DuckDB and provision datasets
 
-In the Superset UI:
+Run the automated provisioning script (from the project root, with the venv activated):
 
-1. **Settings → Database Connections → + Database**
-2. **Choose database**: DuckDB (or "Other" → SQLAlchemy URI)
-3. **SQLAlchemy URI**: `duckdb:////app/data/airline.duckdb?access_mode=read_only`
-4. **Display name**: `airline-duckdb`
-5. Test connection → save
+```bash
+.venv/Scripts/python dashboard/superset/setup_datasets.py
+```
+
+It creates (idempotently):
+- 1 database connection `airline-duckdb` → `/app/data/airline.duckdb` (read-only)
+- 19 datasets across `main_marts`, `main_intermediate`, `main_ontology` schemas
+
+Re-running the script is safe: it detects existing resources via the API's
+422 "already exists" response and skips them.
+
+> Manual alternative (if you prefer the UI):
+> Settings → Database Connections → + Database → SQLAlchemy URI =
+> `duckdb:////app/data/airline.duckdb?access_mode=read_only`
 
 ## Sanity check query
 

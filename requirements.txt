@@ -8,3 +8,6 @@ openpyxl>=3.1
 dbt-core>=1.9,<2
 dbt-duckdb>=1.9,<2
 duckdb>=1.0
+
+# Dashboard tooling (Part 3) — API client to provision Superset datasets
+requests>=2.31
