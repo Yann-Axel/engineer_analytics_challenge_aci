@@ -1,0 +1,86 @@
+# Declarative ontology rules
+# Format: 1 yaml entry per concept, machine-readable + human-readable.
+# This file is the source of truth for the business rule; the SQL in
+# dbt/models/ontology/ont_*.sql is the implementation.
+
+ontology_version: "1.0"
+
+concepts:
+
+  - name: HighValueAtRiskCustomer
+    description: |
+      A customer with substantial LIFETIME spend who has disengaged
+      (above-median recency relative to peers) AND is signalling
+      dissatisfaction via complaints, negative sentiment, or churn-risk score.
+    business_owner: Chief Customer Officer
+    refresh_frequency: weekly
+    inputs:
+      - source: int_customer_lifetime
+      - source: fct_customer_feedback
+    rule:
+      monetary_total_percentile: ">= 0.60"
+      recency_percentile:        ">= 0.60"
+      signal:                    "complaint_count >= 1 OR avg_sentiment < 0 OR churn_risk_score >= 0.40"
+    output: ont_high_value_at_risk_customer
+
+  - name: StrategicUnderperformingRoute
+    description: |
+      A strategic route whose 12-month margin sits in the bottom half of
+      strategic peers AND whose load factor is decent (>= 0.65) — i.e. demand
+      exists but profitability lags peers.
+    business_owner: VP Network
+    refresh_frequency: monthly
+    inputs:
+      - source: int_route_monthly_perf
+      - source: dim_route
+    rule:
+      is_strategic:                          "true"
+      margin_percentile_among_strategic:     "<= 0.50"
+      load_factor_12m:                       ">= 0.65"
+    output: ont_strategic_underperforming_route
+
+  - name: PremiumUpsellCandidate
+    description: |
+      Standard/Business segment customers in Silver/Gold tier with
+      upgrade-offer acceptance rate in the top quartile of presented offers.
+    business_owner: Ancillary Manager
+    refresh_frequency: monthly
+    inputs:
+      - source: fct_ancillary_offers
+      - source: dim_customer_current
+    rule:
+      customer_segment:           "IN ('Standard', 'Business')"
+      loyalty_tier:               "IN ('Silver', 'Gold')"
+      offers_presented:           ">= 2"
+      acceptance_percentile:      ">= 0.75"
+    output: ont_premium_upsell_candidate
+
+  - name: LoyalDetractor
+    description: |
+      A Gold-tier frequent flyer (>=4 segments in 12 months) whose recent
+      feedback skews negative on average (last 180 days).
+    business_owner: Loyalty Manager
+    refresh_frequency: weekly
+    inputs:
+      - source: dim_customer_current
+      - source: int_customer_rfm
+      - source: fct_customer_feedback
+    rule:
+      loyalty_tier:        "= 'Gold'"
+      frequency_12m:       ">= 4"
+      avg_sentiment_6m:    "< -0.3"
+    output: ont_loyal_detractor
+
+  - name: IROPSHeavyRoute
+    description: |
+      A route whose disruption rate is in the top decile AND cancellation
+      rate exceeds 5%, signalling operational fragility.
+    business_owner: COO / Operations Director
+    refresh_frequency: weekly
+    inputs:
+      - source: fct_flights
+      - source: dim_route
+    rule:
+      disruption_percentile_12m:  ">= 0.90"
+      cancellation_rate_12m:      "> 0.05"
+    output: ont_irops_heavy_route

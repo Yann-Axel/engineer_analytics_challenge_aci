@@ -1,0 +1,284 @@
+version: 2
+
+# Semantic layer — business-friendly mapping of the star schema marts.
+# Each semantic_model declares entities, dimensions, and atomic measures.
+# Metrics (24 KPIs) are defined in _metrics.yml and combine these measures.
+
+semantic_models:
+
+  # =========================================================================
+  # FLIGHT — operational fact
+  # =========================================================================
+  - name: flight
+    description: "Operated and scheduled flights with cost, revenue, and disruption context."
+    model: ref('fct_flights')
+    defaults:
+      agg_time_dimension: flight_date
+    entities:
+      - name: flight
+        type: primary
+        expr: flight_sk
+      - name: route
+        type: foreign
+        expr: route_sk
+      - name: aircraft
+        type: foreign
+        expr: aircraft_sk
+      - name: origin_airport
+        type: foreign
+        expr: origin_airport_sk
+      - name: destination_airport
+        type: foreign
+        expr: destination_airport_sk
+    dimensions:
+      - name: flight_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: flight_status
+        type: categorical
+      - name: route_type
+        type: categorical
+      - name: aircraft_type
+        type: categorical
+      - name: distance_band
+        type: categorical
+        expr: case
+                when distance_km < 800  then 'short_haul'
+                when distance_km < 3500 then 'medium_haul'
+                else                         'long_haul'
+              end
+      - name: is_on_time_15
+        type: categorical
+      - name: is_cancelled
+        type: categorical
+      - name: has_disruption
+        type: categorical
+    measures:
+      - name: flights_scheduled
+        description: "Total flights including cancelled."
+        expr: 1
+        agg: sum
+      - name: flights_operated
+        description: "Flights with status <> Cancelled."
+        expr: case when flight_status <> 'Cancelled' then 1 else 0 end
+        agg: sum
+      - name: flights_cancelled
+        expr: case when flight_status = 'Cancelled' then 1 else 0 end
+        agg: sum
+      - name: flights_on_time
+        expr: case when is_on_time_15 then 1 else 0 end
+        agg: sum
+      - name: pax_count
+        agg: sum
+      - name: seat_capacity_sum
+        expr: seat_capacity
+        agg: sum
+      - name: distance_km_total
+        expr: distance_km
+        agg: sum
+      - name: ticket_revenue_total
+        expr: ticket_revenue_usd
+        agg: sum
+      - name: ancillary_revenue_total
+        expr: ancillary_revenue_usd
+        agg: sum
+      - name: total_revenue
+        expr: total_revenue_usd
+        agg: sum
+      - name: total_operating_cost
+        expr: total_operating_cost_usd
+        agg: sum
+      - name: total_margin
+        expr: flight_margin_usd
+        agg: sum
+
+  # =========================================================================
+  # BOOKING — commercial fact
+  # =========================================================================
+  - name: booking
+    description: "Bookings with SCD2 customer version and fare context."
+    model: ref('fct_bookings')
+    defaults:
+      agg_time_dimension: booking_date
+    entities:
+      - name: booking
+        type: primary
+        expr: booking_sk
+      - name: customer
+        type: foreign
+        expr: customer_id
+      - name: flight
+        type: foreign
+        expr: flight_sk
+      - name: route
+        type: foreign
+        expr: route_sk
+      - name: fare
+        type: foreign
+        expr: fare_sk
+    dimensions:
+      - name: booking_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: fare_class
+        type: categorical
+      - name: fare_family
+        type: categorical
+      - name: booking_channel
+        type: categorical
+      - name: booking_status
+        type: categorical
+      - name: loyalty_tier_at_booking
+        type: categorical
+      - name: customer_segment_at_booking
+        type: categorical
+      - name: is_premium_cabin
+        type: categorical
+    measures:
+      - name: bookings_count
+        expr: 1
+        agg: sum
+      - name: flown_bookings_count
+        expr: case when is_flown then 1 else 0 end
+        agg: sum
+      - name: ticket_revenue
+        expr: ticket_price_usd
+        agg: sum
+      - name: ancillary_revenue
+        expr: ancillary_revenue_usd
+        agg: sum
+      - name: total_booking_revenue
+        expr: total_booking_revenue_usd
+        agg: sum
+      - name: unique_customers
+        expr: customer_id
+        agg: count_distinct
+      - name: bookings_with_ancillary
+        expr: case when ancillary_revenue_usd > 0 then 1 else 0 end
+        agg: sum
+
+  # =========================================================================
+  # CUSTOMER FEEDBACK — unstructured fact, NLP-enriched
+  # =========================================================================
+  - name: feedback
+    description: "Customer feedback with NLP-derived sentiment and categories."
+    model: ref('fct_customer_feedback')
+    defaults:
+      agg_time_dimension: feedback_date
+    entities:
+      - name: feedback
+        type: primary
+        expr: feedback_sk
+      - name: customer
+        type: foreign
+        expr: customer_id
+      - name: route
+        type: foreign
+        expr: route_sk
+    dimensions:
+      - name: feedback_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: sentiment_label
+        type: categorical
+      - name: complaint_category
+        type: categorical
+      - name: language
+        type: categorical
+      - name: feedback_channel
+        type: categorical
+    measures:
+      - name: feedbacks_count
+        expr: 1
+        agg: sum
+      - name: avg_sentiment_score
+        expr: sentiment_score
+        agg: average
+      - name: negative_feedback_count
+        expr: case when is_negative then 1 else 0 end
+        agg: sum
+      - name: positive_feedback_count
+        expr: case when is_positive then 1 else 0 end
+        agg: sum
+
+  # =========================================================================
+  # ANCILLARY OFFER — upsell fact
+  # =========================================================================
+  - name: ancillary_offer
+    description: "Ancillary offers presented to a booking and their acceptance."
+    model: ref('fct_ancillary_offers')
+    defaults:
+      agg_time_dimension: offer_date
+    entities:
+      - name: offer
+        type: primary
+        expr: ancillary_offer_sk
+      - name: booking
+        type: foreign
+        expr: booking_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+      - name: fare
+        type: foreign
+        expr: fare_sk
+    dimensions:
+      - name: offer_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: offer_type
+        type: categorical
+      - name: fare_class
+        type: categorical
+    measures:
+      - name: offers_presented
+        expr: case when presented_flag then 1 else 0 end
+        agg: sum
+      - name: offers_accepted
+        expr: case when accepted_flag then 1 else 0 end
+        agg: sum
+      - name: ancillary_accepted_revenue
+        expr: accepted_revenue_usd
+        agg: sum
+
+  # =========================================================================
+  # LOYALTY EVENT — retention fact
+  # =========================================================================
+  - name: loyalty_event
+    description: "Loyalty earn and redeem events."
+    model: ref('fct_loyalty_events')
+    defaults:
+      agg_time_dimension: event_date
+    entities:
+      - name: event
+        type: primary
+        expr: loyalty_event_sk
+      - name: customer
+        type: foreign
+        expr: customer_id
+      - name: route
+        type: foreign
+        expr: route_sk
+    dimensions:
+      - name: event_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: event_type
+        type: categorical
+      - name: tier_at_event
+        type: categorical
+    measures:
+      - name: events_count
+        expr: 1
+        agg: sum
+      - name: points_earned_total
+        expr: points_earned
+        agg: sum
+      - name: points_redeemed_total
+        expr: points_redeemed
+        agg: sum

@@ -1,0 +1,13 @@
+# Local DuckDB profile.
+# The path is relative to the dbt/ directory.
+# enriched_dir is exposed as a dbt variable so all sources can reference it.
+
+air_cote_divoire:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "airline.duckdb"
+      threads: 4
+      extensions:
+        - parquet

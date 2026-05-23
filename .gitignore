@@ -28,7 +28,7 @@ dbt/target/
 dbt/dbt_packages/
 dbt/logs/
 dbt/.user.yml
-dbt/profiles.yml
+# Note: dbt/profiles.yml is NOT ignored — see dbt/.gitignore comment.
 
 # ---------- Notebooks ----------
 .ipynb_checkpoints/

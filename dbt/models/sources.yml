@@ -1,0 +1,147 @@
+version: 2
+
+sources:
+  - name: air_cote_divoire
+    description: |
+      Enriched synthetic dataset produced by `scripts/run_all.py` (Part 1).
+      14 entities materialised as Parquet files under `data/enriched/`.
+      The raw starter Excel is preserved 1:1 in `data/raw/` but not consumed by dbt.
+    meta:
+      owner: analytics-engineering
+      contains_pii: false
+    # External Parquet files read via DuckDB's native parquet reader.
+    # The path is resolved relative to the dbt project root (dbt/).
+    config:
+      external_location: "../data/enriched/{name}.parquet"
+
+    tables:
+      - name: airports
+        description: "Airport reference (IATA, location, timezone). 13 rows."
+        columns:
+          - name: airport_code
+            description: "IATA 3-letter code (PK)."
+            tests:
+              - not_null
+              - unique
+
+      - name: routes
+        description: "Operated and candidate routes. 16 rows."
+        columns:
+          - name: route_id
+            description: "Route surrogate id (PK)."
+            tests: [not_null, unique]
+          - name: route_type
+            description: "Domestic / Regional / International."
+            tests:
+              - accepted_values:
+                  values: [Domestic, Regional, International]
+
+      - name: aircraft
+        description: "Fleet (9 tails)."
+        columns:
+          - name: tail_number
+            tests: [not_null, unique]
+          - name: aircraft_type
+            tests:
+              - accepted_values:
+                  values: [A319, A320, A320neo, "A330-900neo"]
+
+      - name: customers
+        description: "Customer base, 1,000 rows (300 starter + 700 enriched)."
+        columns:
+          - name: customer_id
+            tests: [not_null, unique]
+          - name: customer_segment
+            tests:
+              - accepted_values:
+                  values: [Budget, Standard, Business, Premium]
+
+      - name: flights
+        description: "Flight schedule, 24 months (~8.7k rows)."
+        columns:
+          - name: flight_id
+            tests: [not_null, unique]
+          - name: route_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source('air_cote_divoire', 'routes')
+                  field: route_id
+          - name: tail_number
+            tests:
+              - relationships:
+                  to: source('air_cote_divoire', 'aircraft')
+                  field: tail_number
+
+      - name: bookings
+        description: "Bookings fact, ~1.1M rows."
+        columns:
+          - name: booking_id
+            tests: [not_null, unique]
+          - name: customer_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source('air_cote_divoire', 'customers')
+                  field: customer_id
+          - name: flight_id
+            tests:
+              - not_null
+              - relationships:
+                  to: source('air_cote_divoire', 'flights')
+                  field: flight_id
+
+      - name: flight_costs
+        description: "One cost decomposition per flight."
+        columns:
+          - name: flight_id
+            tests: [not_null, unique]
+
+      - name: disruptions
+        description: "Disruption events tied to flights (~1.8k rows)."
+        columns:
+          - name: disruption_id
+            tests: [not_null, unique]
+          - name: flight_id
+            tests:
+              - not_null
+
+      - name: weather_daily
+        description: "Daily weather proxy per airport (~9.5k rows)."
+        columns:
+          - name: airport_code
+            tests: [not_null]
+          - name: weather_date
+            tests: [not_null]
+
+      - name: loyalty_activity
+        description: "Loyalty earn / redeem events (~650k rows)."
+        columns:
+          - name: loyalty_event_id
+            tests: [not_null, unique]
+
+      - name: ancillary_offers
+        description: "Ancillary offer presentation + acceptance (~3.3M rows)."
+        columns:
+          - name: ancillary_offer_id
+            tests: [not_null, unique]
+
+      - name: cargo_shipments
+        description: "Cargo on long-haul flights (~5.6k rows)."
+        columns:
+          - name: cargo_shipment_id
+            tests: [not_null, unique]
+
+      - name: competitors
+        description: "Monthly competitor benchmark per route (~600 rows)."
+
+      - name: customer_feedback
+        description: |
+          Unstructured feedback (3,000 rows, FR/EN).
+          Free text only — sentiment, complaint_category and tags are derived
+          downstream in the NLP staging layer.
+        columns:
+          - name: feedback_id
+            tests: [not_null, unique]
+          - name: raw_text
+            tests: [not_null]
