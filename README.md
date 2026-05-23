@@ -19,6 +19,46 @@ Growth-allocation analytics product for Air Côte d'Ivoire. The artefact answers
 
 ## How to (re)run end-to-end
 
+### Option A — Docker (recommended, zero local setup)
+
+A unified [docker-compose.yml](docker-compose.yml) at the root orchestrates the
+whole stack: a one-shot **pipeline** service (Part 1+2) followed by **Superset**
+(Part 3), with the **MCP server** (Part 4) available on demand.
+
+```bash
+# 1. Build images + run pipeline + bring up Superset
+docker compose up --build pipeline superset
+
+# 2. (First Superset run only) bootstrap admin + roles
+bash dashboard/superset/bootstrap.sh
+
+# 3. (First Superset run only) provision datasets/charts/dashboards
+.venv/Scripts/python dashboard/superset/setup_datasets.py
+.venv/Scripts/python dashboard/superset/setup_charts.py
+.venv/Scripts/python dashboard/superset/setup_dashboards.py
+
+# 4. MCP server (ad-hoc, stdio) — used by Claude Desktop / Claude Code
+docker compose run --rm mcp
+```
+
+Superset is served at <http://localhost:8088> (login: `admin` / `admin`).
+The generated artefacts (`data/enriched/`, `dbt/airline.duckdb`,
+`dbt/target/`) are bind-mounted to the host so `dbt docs serve` and any local
+inspection work as usual.
+
+To wire the dockerised MCP server into Claude Desktop, replace the
+`mcp_server` block in your `claude_desktop_config.json` with:
+
+```json
+"air-cote-divoire": {
+  "command": "docker",
+  "args": ["compose", "-f", "<PROJECT_ROOT>/docker-compose.yml",
+           "run", "--rm", "-T", "mcp"]
+}
+```
+
+### Option B — Local Python (no Docker)
+
 ```bash
 # 1. Setup (one-off)
 python -m venv .venv

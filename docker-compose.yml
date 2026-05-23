@@ -1,0 +1,86 @@
+# =============================================================================
+# Air Côte d'Ivoire — unified Docker stack
+#
+#   pipeline → one-shot service that generates synthetic data (Part 1) and
+#              runs the full dbt build (Part 2). Writes ./data/enriched/ and
+#              ./dbt/airline.duckdb on the host via bind-mounts. Exits 0.
+#
+#   superset → Apache Superset 4.1.2 (Part 3). Waits for `pipeline` to
+#              complete, then mounts ./dbt/airline.duckdb read-only.
+#              Available at http://localhost:8088 (admin/admin).
+#
+#   mcp      → MCP server (Part 4). Disabled by default — start with
+#              `docker compose run --rm mcp` for stdio interaction, or wire
+#              it into Claude Desktop via `docker run -i ...` (see README).
+#
+# Quick start:
+#     docker compose up --build pipeline superset
+# =============================================================================
+
+services:
+
+  # ── Part 1+2 ─ data generation + dbt build (one-shot) ──────────────────────
+  pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: airline-pipeline:latest
+    container_name: airline-pipeline
+    working_dir: /app
+    volumes:
+      # Persist generated artefacts on the host so Superset, MCP and the
+      # developer all see the same files.
+      - ./data:/app/data
+      - ./dbt:/app/dbt
+      # Optional: mount the starter Excel if you have it locally. The
+      # entrypoint detects its absence and falls back to data/raw/.
+      - ./air_cote_divoire_starter_dataset.xlsx:/app/air_cote_divoire_starter_dataset.xlsx:ro
+    command: ["/app/docker/entrypoint-pipeline.sh"]
+    restart: "no"
+
+  # ── Part 3 ─ Apache Superset dashboard ─────────────────────────────────────
+  superset:
+    build:
+      context: ./dashboard/superset
+      dockerfile: Dockerfile
+    container_name: airline-superset
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-secret-key-replace-in-prod-1234567890abcdef1234567890abcdef}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      SUPERSET_LOAD_EXAMPLES: "no"
+    volumes:
+      - ./dashboard/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
+      - superset_home:/app/superset_home
+      - ./dbt/airline.duckdb:/app/data/airline.duckdb:ro
+    depends_on:
+      pipeline:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ── Part 4 ─ MCP server (stdio; ad-hoc) ────────────────────────────────────
+  # Not part of the default `up` because MCP is a stdio process driven by an
+  # AI assistant. Start it with `docker compose run --rm mcp`.
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: airline-pipeline:latest
+    container_name: airline-mcp
+    working_dir: /app
+    volumes:
+      - ./dbt/airline.duckdb:/app/dbt/airline.duckdb:ro
+    command: ["python", "-m", "mcp_server"]
+    stdin_open: true
+    tty: false
+    profiles: ["mcp"]
+
+volumes:
+  superset_home: {}
