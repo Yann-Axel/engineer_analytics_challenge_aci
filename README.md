@@ -13,7 +13,7 @@ Growth-allocation analytics product for Air Côte d'Ivoire. The artefact answers
 /dbt                dbt project: staging, marts, semantic, ontology
 /notebooks          Exploratory / NLP / validation notebooks
 /dashboard          Apache Superset assets (Part 3)
-/mcp                MCP server exposing the semantic layer (Part 4)
+/mcp_server         MCP server exposing the marts + feedback to AI assistants (Part 4)
 /docs               Documentation (business framing, modeling, ontology, NLP)
 ```
 
@@ -89,66 +89,37 @@ Spin-up commands in [docs/09_dashboard_design.md §3](docs/09_dashboard_design.m
 
 ## Part 4 — Agentic AI / MCP server ✅
 
-**Status: 8 tools + 1 resource exposed via stdio MCP; 17/17 tests PASS; 5/5 grounded questions answered end-to-end via the protocol.**
+The brief asks for a small MCP server exposing structured + unstructured data with a few grounded questions, plus a video and a brief architecture explanation.
 
-### Surface
-
-| | Count | What |
-|---|---|---|
-| **Tools** | 8 | 5 ontology concepts + 1 KPI summary + 1 NLP search + 1 compare_routes |
-| **Resources** | 1 | `glossary://airline-business` (4.7 KB Markdown) |
-| **Tests** | 17 | safety (5) + ontology (6) + others (6) — all PASS in ~1s |
-| **Smoke test** | 5 questions | All 3 brief acceptance questions + 2 bonuses answered via real MCP stdio |
-
-### Senior trade-off
-
-**Specialised tools, not a generic `run_sql`.** The LLM never writes SQL; it picks among 8 contract-bound tools, each with parameterised SQL we wrote, tested, and committed. Trade: more code on our side. Pay-off: explainability, auditability, and safety by construction. Every tool returns the SQL it executed (audit trail) and is capped at 1 000 rows.
-
-### Spin-up
-
-```bash
-# Prereqs: dbt/airline.duckdb already built (Part 2)
-.venv/Scripts/python -m mcp_server.smoke_test                       # 5/5 PASS
-.venv/Scripts/python -m pytest mcp_server/tests/                    # 17/17 PASS
-# Wire Claude Desktop: edit %APPDATA%/Claude/claude_desktop_config.json
-# with the block from mcp_server/claude_desktop_config.json (replace <PROJECT_ROOT>)
-```
-
-### Brief acceptance — covered end-to-end
-
-| Brief requirement | Where in the project |
+| Brief requirement | Deliverable |
 |---|---|
-| MCP server (or equivalent tool layer) | [mcp_server/](mcp_server/) (Python + FastMCP, stdio) |
-| AI assistant can use it | Claude Desktop config in [mcp_server/claude_desktop_config.json](mcp_server/claude_desktop_config.json) |
-| Structured data | Tools 1-6, 8 (ontology + KPI + compare) |
-| ≥ 1 unstructured source | Tool 7 `search_feedback_text` — returns raw FR/EN feedback text |
-| Grounded Q1 — *"Which routes deserve more budget?"* | `list_strategic_underperforming_routes` + `list_irops_heavy_routes` |
-| Grounded Q2 — *"Which high-value customers are at risk?"* | `list_high_value_at_risk_customers` |
-| Grounded Q3 — *"Complaints on route X?"* | `get_network_summary` + `search_feedback_text` |
-| Video + brief architecture | Script + diagram in [docs/12_video_walkthrough.md](docs/12_video_walkthrough.md) |
+| Small MCP server (or equivalent tool layer) | [`mcp_server/`](mcp_server/) — Python FastMCP, stdio, 3 tools inline in `server.py` |
+| AI assistant can use it | [`mcp_server/claude_desktop_config.json`](mcp_server/claude_desktop_config.json) |
+| Structured + ≥ 1 unstructured source | 2 structured tools (`list_routes_with_kpis`, `list_high_value_at_risk_customers`) + 1 unstructured (`search_feedback_text` → raw FR/EN text) |
+| Q1 — *"Which routes deserve more budget?"* | `list_routes_with_kpis` |
+| Q2 — *"Which high-value customers are at risk?"* | `list_high_value_at_risk_customers` |
+| Q3 — *"Complaints on route X?"* | `search_feedback_text` (the unstructured-source tool) |
+| Video + brief architecture | Script + architecture in [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md) |
 
-Architecture deep-dive: [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md). Quick-start: [mcp_server/README.md](mcp_server/README.md).
+Run: `python -m mcp_server.smoke_test` answers the three questions end-to-end via the real MCP protocol. Quick-start: [`mcp_server/README.md`](mcp_server/README.md).
 
-## Senior criteria — status after Part 4 (FINAL)
+## Senior criteria — status (FINAL)
 
 | Brief criterion | Status |
 |---|---|
-| Deliberate modeling trade-offs | ✅ Star vs DV vs hybrid; SCD2 ciblé; Superset vs Streamlit; specialised tools vs run_sql |
-| Reusable semantic layer | ✅ 10 KPIs in `_metrics.yml` + 5 entities in `_semantic_models.yml`, consumed by dashboard and MCP |
-| Ontology-inspired inference | ✅ 2 brief-named concepts (+ 3 used downstream) in SQL + declarative YAML rules |
-| **Robust AI tooling** | ✅ 8 specialised tools + Pydantic validation + read-only DB + 17 tests + E2E smoke |
-| Strong documentation | ✅ 8 docs in `/docs` + dbt docs site + screenshots |
-
-**5/5 senior criteria validated. Project complete.**
+| Deliberate modeling trade-offs | ✅ Star + SCD2 ciblé justified; Superset chosen over Streamlit; specialised tools over run_sql |
+| Reusable semantic layer | ✅ 10 KPIs in `_metrics.yml` + 5 entities in `_semantic_models.yml` |
+| Ontology-inspired inference | ✅ 2 brief-named concepts in SQL + declarative YAML rules |
+| **Robust AI tooling** | ✅ 3 specialised tools + Pydantic validation + read-only DB + audit envelope + E2E smoke test |
+| Strong documentation | ✅ 8 docs in `/docs` + screenshots |
 
 ## Decisions log
 
 - [docs/01_business_framing.md](docs/01_business_framing.md) — 5 domains + 10 KPIs (Part 1)
-- [docs/02_data_dictionary.md](docs/02_data_dictionary.md) — column reference for the enriched layer (Part-2 aid)
+- [docs/02_data_dictionary.md](docs/02_data_dictionary.md) — column reference (Part-2 aid)
 - [docs/03_assumptions.md](docs/03_assumptions.md) — 5 load-bearing assumptions (Part 1)
-- [docs/04_modeling_choices.md](docs/04_modeling_choices.md) — **Part 2 consolidated**: star schema choice + ERD + semantic layer + ontology + NLP + naming conventions
-- [docs/05_ontology_rules.yml](docs/05_ontology_rules.yml) — machine-readable rules for the 5 ontology concepts
-- [docs/09_dashboard_design.md](docs/09_dashboard_design.md) — Part 3 — Superset stack, per-page rationale
+- [docs/04_modeling_choices.md](docs/04_modeling_choices.md) — Part 2 consolidated
+- [docs/05_ontology_rules.yml](docs/05_ontology_rules.yml) — machine-readable ontology rules
+- [docs/09_dashboard_design.md](docs/09_dashboard_design.md) — Part 3 — Superset stack, mapping
 - [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md) — Part 3 — one-page CEO printable
-- [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md) — Part 4 — MCP server architecture
-- [docs/12_video_walkthrough.md](docs/12_video_walkthrough.md) — Part 4 — video script + recording guide
+- [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md) — Part 4 — MCP architecture + video script
