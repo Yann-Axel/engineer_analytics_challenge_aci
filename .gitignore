@@ -79,3 +79,12 @@ secrets/
 # ---------- Superset local runtime (docker volumes, instance data) ----------
 dashboard/superset/superset_home/
 dashboard/superset/.docker/
+
+# ---------- Recruiter-provided inputs (recruiter already has them) ----------
+air_cote_divoire_starter_dataset.xlsx
+analytics_engineer_challenge_brief.docx.pdf
+
+# ---------- Unused / redundant placeholders ----------
+notebooks/
+dashboard/.gitkeep
+dbt/.gitkeep
