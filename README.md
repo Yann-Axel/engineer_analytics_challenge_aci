@@ -55,56 +55,17 @@ Regenerate in one command: `python scripts/run_all.py` (~2 min, seed=42, fully r
 
 ## Part 2 — Modeling, semantic layer, ontology ✅
 
-**Status: 160/160 dbt tests PASS.**
+The brief asks for four things; here is how each is met:
 
-### Decision trade-off
-
-**Star Schema + targeted SCD2 on `dim_customer`** (loyalty_tier). Pure star would be naïve for tier-progression KPIs; Data Vault would be overkill for a single synthetic source and hurt the AI agent in Part 4. See `docs/04_modeling_choices.md`.
-
-### Layers
-
-| Layer | Models | Materialisation |
-|---|---|---|
-| Sources | 14 declared in `dbt/models/sources.yml` | — |
-| Seeds (NLP) | 3 CSV (lexicon, taxonomy, negation) | seeded table |
-| Staging | 14 `stg_*.sql` | view |
-| Intermediate | 12 (`int_*`) of which **5 NLP-dedicated** | table / ephemeral |
-| Marts — dim | 6 (`dim_date`, `dim_airport`, `dim_route`, `dim_aircraft`, `dim_fare`, `dim_customer_current`) | table |
-| Marts — fct | 5 (`fct_flights`, `fct_bookings`, `fct_customer_feedback`, `fct_ancillary_offers`, `fct_loyalty_events`) | table |
-| Snapshot SCD2 | `snapshots/dim_customer_snapshot.sql` | snapshot |
-| Semantic | `_semantic_models.yml` + `_metrics.yml` (24 business KPIs as metrics) | YAML |
-| Ontology | 5 `ont_*.sql` + `_ontology__models.yml` + `docs/05_ontology_rules.yml` | table |
-| Tests | 116 generic + 3 singular = **160 assertions** | — |
-
-### 5 ontology concepts
-
-| Concept | Rows | Answers brief acceptance question |
-|---|---|---|
-| `ont_high_value_at_risk_customer` | 20 | "Which high-value customers are at risk of churn?" |
-| `ont_strategic_underperforming_route` | 2 | "Routes unprofitable from ops issues vs weak demand?" |
-| `ont_premium_upsell_candidate` | 48 | "Which segments should receive premium offers?" |
-| `ont_loyal_detractor` | 22 | (early-warning retention) |
-| `ont_irops_heavy_route` | 5 | "Routes losing margin to ops issues" |
-
-### NLP integration (unstructured → structured)
-
-3,000 raw feedbacks (FR/EN) → sentiment scoring + complaint categories + semantic tags + route-level themes.
-
-| Approach | Why senior |
+| Brief requirement | Deliverable |
 |---|---|
-| **Lexicon + SQL** (145 polarised words, 62 keyword categories, 18 negation words) | Explainable, offline, zero dependency, traceable — every score can be defended to an exec |
+| Build a model supporting the 3 themes | Star schema in `dbt/models/marts/` — 6 dim × 5 fct |
+| Justify Star / DV / Hybrid choice | [docs/04_modeling_choices.md §1](docs/04_modeling_choices.md) — trade-off table |
+| Semantic layer (entities, KPIs, joins, naming) | `_semantic_models.yml` + `_metrics.yml` (10 KPIs aligned with Part 1) + naming conventions in `04_modeling_choices.md §6` |
+| Ontology-inspired layer with reasoning rules | 2 concepts named in the brief (`ont_high_value_at_risk_customer`, `ont_strategic_underperforming_route`) implemented as SQL + declarative rules in [docs/05_ontology_rules.yml](docs/05_ontology_rules.yml) |
+| Show how unstructured is integrated | Lexicon-based sentiment scoring → `fct_customer_feedback`. Pipeline + worked example in `04_modeling_choices.md §5` |
 
-Distribution: 40 % negative / 32 % neutral / 29 % positive across 10 complaint categories. See `docs/08_nlp_pipeline.md`.
-
-### Senior criteria — status after Part 2
-
-| Brief criterion | Status |
-|---|---|
-| Deliberate modeling trade-offs | ✅ Star vs DV vs hybrid documented; SCD2 ciblé justifié |
-| Reusable semantic layer | ✅ 24 KPIs in `_metrics.yml` + 5 entities in `_semantic_models.yml` |
-| Ontology-inspired inference | ✅ 5 concepts (SQL + YAML rules) |
-| Robust AI tooling | ⏳ Pending Part 4 — semantic + ontology ready to be tool-wrapped |
-| Strong documentation | ✅ 8 docs in `/docs` + `dbt docs generate` lineage site |
+Run: `cd dbt && dbt build` → **160 / 160 tests PASS in ~12 s**.
 
 ## Part 3 — Executive Growth Allocation Dashboard ✅
 
@@ -205,25 +166,21 @@ Architecture deep-dive: [docs/11_mcp_architecture.md](docs/11_mcp_architecture.m
 | Brief criterion | Status |
 |---|---|
 | Deliberate modeling trade-offs | ✅ Star vs DV vs hybrid; SCD2 ciblé; Superset vs Streamlit; specialised tools vs run_sql |
-| Reusable semantic layer | ✅ 24 KPIs in `_metrics.yml`, consumed by dashboard charts AND MCP tools |
-| Ontology-inspired inference | ✅ 5 concepts → 5 dashboard tables → 5 MCP tools (one path, consumed twice) |
+| Reusable semantic layer | ✅ 10 KPIs in `_metrics.yml` + 5 entities in `_semantic_models.yml`, consumed by dashboard and MCP |
+| Ontology-inspired inference | ✅ 2 brief-named concepts (+ 3 used downstream) in SQL + declarative YAML rules |
 | **Robust AI tooling** | ✅ 8 specialised tools + Pydantic validation + read-only DB + 17 tests + E2E smoke |
-| Strong documentation | ✅ 12 docs in `/docs` + dbt docs site + dashboard + architecture + video script |
+| Strong documentation | ✅ 8 docs in `/docs` + dbt docs site + screenshots |
 
 **5/5 senior criteria validated. Project complete.**
 
 ## Decisions log
 
-- `docs/01_business_framing.md` — domains, personas, 24 KPIs
-- `docs/02_data_dictionary.md` — every column documented
-- `docs/03_assumptions.md` — 15 sections of tunable assumptions
-- `docs/04_modeling_choices.md` — star schema + SCD2 trade-off
-- `docs/05_naming_conventions.md` — prefixes, suffixes, file layout
-- `docs/05_ontology_rules.yml` — declarative rules (YAML, machine-readable)
-- `docs/06_semantic_layer.md` — entities + 24 KPIs mapping
-- `docs/07_ontology.md` — 5 concepts + acceptance-question mapping
-- `docs/08_nlp_pipeline.md` — NLP step-by-step + lexicons + limits
-- `docs/09_dashboard_design.md` — Superset/DuckDB stack, per-page rationale, 5 bugs fixed
-- `docs/10_executive_recommendations.md` — one-page CEO printable
-- `docs/11_mcp_architecture.md` — MCP server architecture + senior trade-offs
-- `docs/12_video_walkthrough.md` — video script + recording instructions
+- [docs/01_business_framing.md](docs/01_business_framing.md) — 5 domains + 10 KPIs (Part 1)
+- [docs/02_data_dictionary.md](docs/02_data_dictionary.md) — column reference for the enriched layer (Part-2 aid)
+- [docs/03_assumptions.md](docs/03_assumptions.md) — 5 load-bearing assumptions (Part 1)
+- [docs/04_modeling_choices.md](docs/04_modeling_choices.md) — **Part 2 consolidated**: star schema choice + ERD + semantic layer + ontology + NLP + naming conventions
+- [docs/05_ontology_rules.yml](docs/05_ontology_rules.yml) — machine-readable rules for the 5 ontology concepts
+- [docs/09_dashboard_design.md](docs/09_dashboard_design.md) — Part 3 — Superset stack, per-page rationale
+- [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md) — Part 3 — one-page CEO printable
+- [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md) — Part 4 — MCP server architecture
+- [docs/12_video_walkthrough.md](docs/12_video_walkthrough.md) — Part 4 — video script + recording guide

@@ -160,7 +160,7 @@ This is **not a collection of charts** — it's **4 action-oriented tables** fed
 | Loyalty Points Earned | Up · Loyalty Points Trend | `fct_loyalty_events` |
 | Premium Mix | KPI · Premium Mix | `fct_bookings` |
 
-**All KPIs trace back to the 24-metric catalogue in `docs/06_semantic_layer.md` and `dbt/models/semantic/_metrics.yml`** — no SQL was rewritten in the dashboard.
+**All KPIs trace back to the 10-metric catalogue in `dbt/models/semantic/_metrics.yml` and `docs/04_modeling_choices.md`** — no SQL was rewritten in the dashboard.
 
 ---
 

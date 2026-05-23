@@ -1,90 +1,126 @@
-# Part 2 — Modeling choices (Star Schema + targeted SCD2)
+# Part 2 — Model, semantic layer, ontology & unstructured integration
 
-## Decision
+This single document covers the four Part-2 brief requirements:
+modelling choice, semantic layer, ontology, and unstructured-data integration.
 
-**Star schema** in dbt + DuckDB, with **SCD2 targeted on `dim_customer`** only.
+---
 
-## Rationale (deliberate trade-off)
+## 1. Modelling choice — Star Schema + targeted SCD2 on `dim_customer`
 
-| Criterion | Star | Data Vault | Hybrid | Weight | Notes |
-|---|---|---|---|---|---|
-| Volume (~5M rows, single synthetic source) | ✅ fits | ❌ overkill | ❌ | High | DV is built for very large, multi-source environments. We have one curated source. |
-| BI-friendly (Apache Superset, Part 3) | ✅ native | ❌ needs views | ⚠️ | High | Superset reads dim/fact best. |
-| MCP / LLM friendly (Part 4) | ✅ easy joins | ❌ many hubs/links/sats | ⚠️ | **High** | An agent reasons faster on flat fact + dim than on raw vault. |
-| Auditability of multi-source merges | ⚠️ | ✅ | ✅ | Low | N/A: we have one source. |
-| Historisation of slowly changing attributes | ❌ native limit | ✅ | ✅ | Medium | Solved with **targeted SCD2** below. |
+| Criterion | Star | Data Vault | Hybrid | Weight |
+|---|---|---|---|---|
+| Single synthetic source, ~5M rows | ✅ | ❌ overkill | ❌ | High |
+| Consumed by BI (Part 3) & AI agent (Part 4) | ✅ | ❌ needs vues | ⚠️ | High |
+| Audit of multi-source merges | ⚠️ | ✅ | ✅ | Low (one source) |
+| Historisation of changing attributes | native limit | ✅ | ✅ | Medium → addressed by **targeted SCD2** |
 
-### Targeted SCD2 on `dim_customer`
+**Decision**: star schema, with a **SCD2 snapshot on `dim_customer`** for `loyalty_tier` only — needed to compute "tier at booking time" for retention KPIs. Other dimensions remain SCD1 (no business reason for history).
 
-We snapshot only **customers**, tracking changes to `loyalty_tier`, `customer_segment`, `preferred_channel`. Reasons:
+---
 
-- `loyalty_tier` is the only attribute that legitimately evolves and matters for KPIs (Loyalty Tier Progression, "tier at booking time").
-- `dim_route`, `dim_airport`, `dim_aircraft` are stable — full SCD2 would be over-engineering.
-- `fct_bookings` joins to the customer **version** valid at `booking_date`, computing tier-at-event correctly.
-
-## What this enables (mapped to the brief's three themes)
-
-| Theme | Fact tables used | Dimensions used | KPIs unlocked |
-|---|---|---|---|
-| **Route optimization & growth** | `fct_flights` + `int_route_monthly_perf` | `dim_route`, `dim_aircraft`, `dim_date`, `dim_airport` | Route Revenue, Margin %, Load Factor, OTP15, Cancel Rate, RASK |
-| **Customer retention** | `fct_bookings` + `fct_customer_feedback` + `fct_loyalty_events` | `dim_customer_current` + SCD2 snapshot, `dim_date`, `dim_route` | RFM, CLV, Churn Risk, Repeat Rate, Avg Sentiment, Tier Progression |
-| **Upsell / Cross-sell** | `fct_ancillary_offers` + `fct_bookings` | `dim_customer_current`, `dim_fare`, `dim_route` | Attach Rate, ARPP, Upgrade Conversion, Offer Acceptance, Premium Mix |
-
-## ERD (Mermaid)
-
-```mermaid
-erDiagram
-    DIM_DATE        ||--o{ FCT_FLIGHTS              : "flight_date_sk"
-    DIM_DATE        ||--o{ FCT_BOOKINGS             : "booking_date_sk"
-    DIM_DATE        ||--o{ FCT_CUSTOMER_FEEDBACK    : "feedback_date_sk"
-    DIM_DATE        ||--o{ FCT_ANCILLARY_OFFERS     : "offer_date_sk"
-    DIM_DATE        ||--o{ FCT_LOYALTY_EVENTS       : "event_date_sk"
-
-    DIM_CUSTOMER    ||--o{ FCT_BOOKINGS             : "customer_id (SCD2 versioned)"
-    DIM_CUSTOMER    ||--o{ FCT_CUSTOMER_FEEDBACK    : "customer_sk"
-    DIM_CUSTOMER    ||--o{ FCT_ANCILLARY_OFFERS     : "customer_sk"
-    DIM_CUSTOMER    ||--o{ FCT_LOYALTY_EVENTS       : "customer_sk"
-
-    DIM_ROUTE       ||--o{ FCT_FLIGHTS              : "route_sk"
-    DIM_ROUTE       ||--o{ FCT_BOOKINGS             : "route_sk"
-    DIM_ROUTE       ||--o{ FCT_CUSTOMER_FEEDBACK    : "route_sk"
-    DIM_ROUTE       ||--o{ FCT_LOYALTY_EVENTS       : "route_sk"
-
-    DIM_AIRCRAFT    ||--o{ FCT_FLIGHTS              : "aircraft_sk"
-    DIM_AIRPORT     ||--o{ FCT_FLIGHTS              : "origin/destination"
-    DIM_FARE        ||--o{ FCT_BOOKINGS             : "fare_sk"
-    DIM_FARE        ||--o{ FCT_ANCILLARY_OFFERS     : "fare_sk"
-
-    FCT_FLIGHTS     ||--o{ FCT_BOOKINGS             : "flight_sk"
-    FCT_FLIGHTS     ||--o{ FCT_CUSTOMER_FEEDBACK    : "flight_sk"
-```
-
-Five ontology concepts derive from these marts:
+## 2. The model — 5 facts × 6 dimensions
 
 ```
-ont_high_value_at_risk_customer    ←  dim_customer_current + int_customer_lifetime + fct_customer_feedback
-ont_strategic_underperforming_route ←  int_route_monthly_perf + dim_route
-ont_premium_upsell_candidate        ←  fct_ancillary_offers + dim_customer_current
-ont_loyal_detractor                 ←  dim_customer_current + fct_customer_feedback
-ont_irops_heavy_route               ←  fct_flights + dim_route
+                    dim_date
+                       │
+   dim_customer ───────┼──── dim_route ─── dim_aircraft / dim_airport
+   (SCD2 snap.)        │
+                       ▼
+                 fct_flights ──── fct_customer_feedback (NLP)
+                       │
+                 fct_bookings ─── dim_fare
+                       │
+              fct_ancillary_offers
+                       │
+              fct_loyalty_events
 ```
 
-## Materialisations (per layer)
+Three brief themes → mart coverage:
 
-| Layer | Default | Why |
+| Theme | Tables |
+|---|---|
+| Route optimization & growth | `fct_flights`, `dim_route`, `dim_aircraft`, `int_route_monthly_perf` |
+| Customer retention | `fct_bookings`, `fct_customer_feedback`, `dim_customer_current` (+ SCD2) |
+| Upsell / cross-sell | `fct_ancillary_offers`, `fct_bookings`, `dim_fare` |
+
+Materialisations: `view` for staging, `table` for marts and ontology, `ephemeral` for intermediate helpers. **160 / 160 dbt tests PASS** after `dbt build`.
+
+---
+
+## 3. Semantic layer
+
+The brief asks for **core entities + KPI definitions + joins + naming conventions**. All four live in two YAML files:
+
+| Brief item | Source of truth | Where |
 |---|---|---|
-| Staging | `view` | Cheap, always-fresh, no storage cost |
-| Intermediate (metric calcs) | `ephemeral` (small) / `table` (reused) | NLP outputs are tables since reused by multiple marts |
-| Intermediate / NLP | `table` | Reused across marts and ontology |
-| Marts (dim + fct) | `table` | Reused everywhere, scan-heavy |
-| Ontology | `table` | Refreshed on cadence per business owner |
+| Core entities (Customer, Flight, Booking, Route, Feedback) | `dbt/models/semantic/_semantic_models.yml` | 5 semantic models |
+| Joins between entities | declared via `entities` (primary / foreign) in the same YAML | inline |
+| KPI definitions (the 10 from Part 1) | `dbt/models/semantic/_metrics.yml` | 10 metrics, each with formula |
+| Naming conventions | this document, §6 | below |
 
-## Volume check after `dbt build`
+KPIs covered (mirror Part 1):
+`route_revenue`, `route_margin_pct`, `load_factor`, `delay_rate`, `cancellation_rate`, `repeat_booking_rate`, `loyalty_engagement`, `ancillary_attach_rate`, `customer_sentiment`, `recency_days`.
 
-| Layer | Models | Rows after build |
+---
+
+## 4. Ontology — reasoning rules that classify business concepts
+
+The brief gives two examples: *High-Value At-Risk Customer* and *Strategic Underperforming Route*. Both are implemented as dbt models in `dbt/models/ontology/`:
+
+| Concept | Rule (declarative) |
+|---|---|
+| **HighValueAtRiskCustomer** | `monetary_total_percentile ≥ 0.60` ∧ `recency_percentile ≥ 0.60` ∧ (complaint OR negative sentiment OR churn_risk ≥ 0.40) |
+| **StrategicUnderperformingRoute** | `is_strategic = true` ∧ `margin_percentile_among_strategic ≤ 0.50` ∧ `load_factor_12m ≥ 0.65` |
+
+The full rules — machine-readable, language-agnostic — are in `docs/05_ontology_rules.yml`. Three additional concepts (`PremiumUpsellCandidate`, `LoyalDetractor`, `IROPSHeavyRoute`) are kept in the same folder because the Part-4 AI agent surfaces them; they share the same SQL-plus-YAML pattern.
+
+**Why this format and not OWL/SHACL?** Because the consumer is a BI tool and an LLM, not a triple store. SQL + YAML is readable by all three (humans, dbt, MCP) without an extra runtime.
+
+---
+
+## 5. Unstructured-data integration
+
+The brief lists four examples — *sentiment scoring, complaint categories, route-level issue themes, or semantic tags*. We deliver the first one as the load-bearing demonstration; the others are by-products in the same pipeline.
+
+**Pipeline (dbt-native, rule-based, explainable):**
+
+```
+data/enriched/customer_feedback.parquet (3,000 raw FR/EN texts)
+       │
+stg_customer_feedback           (normalise text)
+       │
+int_feedback_sentiment          (lexicon-based score in [-1, +1]
+                                 + negation handling 2-token window)
+       │
+fct_customer_feedback           (joinable to dim_customer, dim_route)
+```
+
+**Worked example** — what the input looks like and what the model derives:
+
+| `raw_text` (input) | `sentiment_score` | `sentiment_label` |
 |---|---|---|
-| Staging | 14 views | (passthrough) |
-| Intermediate | 12 (ephemeral + table) | ~1.5M (NLP + perf agg) |
-| Marts | 11 (6 dim + 5 fct) | ~1.1M bookings, 8.7k flights, 3k feedback |
-| Ontology | 5 concepts | 20 + 2 + 48 + 22 + 5 |
-| Tests | 116 generic + 3 singular | 160 PASS / 0 FAIL |
+| `Bagage perdu entre Paris et Abidjan, service injoignable.` | −1.0 | negative |
+| `Surclassement gratuit en classe affaires, expérience fantastique.` | +1.0 | positive |
+
+The lexicon (145 polarised words FR+EN), the complaint taxonomy and the negation list live in `dbt/seeds/`. We picked rule-based over a transformer model so every score is traceable to specific words in the source row — an exec can defend any number on the dashboard.
+
+---
+
+## 6. Naming conventions
+
+| Prefix / suffix | Meaning |
+|---|---|
+| `stg_*` | Staging — 1:1 with source, cast + rename only |
+| `int_*` | Intermediate — joins / pre-aggregations |
+| `dim_*` | Dimension (conformed) |
+| `fct_*` | Fact (grain documented in each model) |
+| `ont_*` | Ontology concept |
+| `_sk` | Surrogate key (integer, generated by `dbt_utils.generate_surrogate_key`) |
+| `_id` | Natural key (varchar) — carried for traceability |
+| `_date` | Date (no time) |
+| `_at` | Timestamp |
+| `_usd` | USD monetary amount |
+| `_pct` | Fraction in `[0, 1]` |
+| `is_*`, `has_*` | Booleans |
+
+Snake case everywhere. Singular vs plural follows the dbt community convention: tables singular where natural (`dim_route`) but plural when colloquial (`fct_bookings`).
