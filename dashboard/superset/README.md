@@ -43,6 +43,27 @@ Re-running the script is safe: it detects existing resources via the API's
 > Settings → Database Connections → + Database → SQLAlchemy URI =
 > `duckdb:////app/data/airline.duckdb?access_mode=read_only`
 
+## Provision charts and dashboards
+
+```bash
+.venv/Scripts/python dashboard/superset/setup_charts.py
+.venv/Scripts/python dashboard/superset/setup_dashboards.py
+```
+
+Creates 34 charts grouped into 5 dashboards (idempotent on re-run):
+
+| # | Slug                        | Charts |
+|---|-----------------------------|-------:|
+| 0 | `executive-overview`        | 10     |
+| 1 | `network-profitability`     | 7      |
+| 2 | `customer-retention`        | 7      |
+| 3 | `upsell-crosssell`          | 6      |
+| 4 | `decision-layer`            | 4      |
+
+All dashboards carry a shared **Date Range** native filter at the top.
+
+Open each one at `http://localhost:8088/superset/dashboard/<slug>/`.
+
 ## Sanity check query
 
 In **SQL Lab → SQL Editor**:
