@@ -1,0 +1,35 @@
+# Minimal Superset stack for the Air Côte d'Ivoire challenge.
+# Single container, SQLite metastore, no Celery/Redis.
+# Reads dbt's DuckDB file via a read-only bind mount.
+
+services:
+  superset:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: airline-superset
+    ports:
+      - "8088:8088"
+    environment:
+      # Secret key — change in real deployments; here it's a local demo.
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-secret-key-replace-in-prod-1234567890abcdef1234567890abcdef}
+      SUPERSET_CONFIG_PATH: /app/pythonpath/superset_config.py
+      # Force admin user creation at startup if not present (idempotent)
+      SUPERSET_LOAD_EXAMPLES: "no"
+    volumes:
+      # Mount our custom config inside the container's pythonpath
+      - ./superset_config.py:/app/pythonpath/superset_config.py:ro
+      # Persistent metastore + user uploads across container restarts
+      - superset_home:/app/superset_home
+      # The dbt-produced DuckDB file — READ-ONLY (Superset never writes here)
+      - ../../dbt/airline.duckdb:/app/data/airline.duckdb:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  superset_home: {}
