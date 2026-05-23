@@ -81,7 +81,7 @@ DBT_PROFILES_DIR=. ../.venv/Scripts/dbt docs serve    # open the lineage site
 | `ont_strategic_underperforming_route` | 2 | "Routes unprofitable from ops issues vs weak demand?" |
 | `ont_premium_upsell_candidate` | 48 | "Which segments should receive premium offers?" |
 | `ont_loyal_detractor` | 22 | (early-warning retention) |
-| `ont_irops_heavy_route` | 1 | "Routes losing margin to ops issues" |
+| `ont_irops_heavy_route` | 5 | "Routes losing margin to ops issues" |
 
 ### NLP integration (unstructured → structured)
 
@@ -103,14 +103,72 @@ Distribution: 40 % negative / 32 % neutral / 29 % positive across 10 complaint c
 | Robust AI tooling | ⏳ Pending Part 4 — semantic + ontology ready to be tool-wrapped |
 | Strong documentation | ✅ 8 docs in `/docs` + `dbt docs generate` lineage site |
 
-## Part 3 — Dashboard ⏳
+## Part 3 — Executive Growth Allocation Dashboard ✅
 
-Pending. Will consume the semantic layer marts via Apache Superset.
+**Status: 5 dashboards × 34 charts, all rendered and screenshot-captured.**
+
+### Stack
+
+Apache Superset 4.1.2 in Docker, reading `dbt/airline.duckdb` via `duckdb-engine`. All 34 charts and 5 dashboards are provisioned via the REST API by versioned Python scripts — **zero drag-and-drop**, fully reproducible.
+
+### 5 dashboards
+
+| # | Slug | Charts | Highlight |
+|---|---|---:|---|
+| 0 | `executive-overview` | 10 | 8 KPI Big Numbers + Revenue trend |
+| 1 | `network-profitability` | 7 | **Route Opportunity Matrix** (bubble, hero) |
+| 2 | `customer-retention` | 7 | **Complaint themes heatmap** (route × category × sentiment) |
+| 3 | `upsell-crosssell` | 6 | Acceptance / ARPP / attach + Premium candidates table |
+| 4 | `decision-layer` | 4 | **4 action tables** fed by the ontology (Grow / Defend / Retain / Prioritize) |
+
+### Screenshots (in `docs/screenshots/`)
+
+| Page | Capture |
+|---|---|
+| 0. Executive Overview | [00_executive_overview.png](docs/screenshots/00_executive_overview.png) |
+| 1. Network & Profitability | [01_network_profitability.png](docs/screenshots/01_network_profitability.png) |
+| 2. Customer & Retention | [02_customer_retention.png](docs/screenshots/02_customer_retention.png) |
+| 3. Upsell & Cross-sell | [03_upsell_crosssell.png](docs/screenshots/03_upsell_crosssell.png) |
+| 4. Decision Layer | [04_decision_layer.png](docs/screenshots/04_decision_layer.png) |
+
+Captures produced by Playwright headless Chromium — fully reproducible (`dashboard/superset/capture_screenshots.py`).
+
+### Spin-up commands
+
+```bash
+cd dashboard/superset
+docker compose up -d
+bash bootstrap.sh                                    # one-off admin user + perms
+cd ../..
+.venv/Scripts/python dashboard/superset/setup_datasets.py
+.venv/Scripts/python dashboard/superset/configure_datetime_columns.py
+.venv/Scripts/python dashboard/superset/setup_charts.py
+.venv/Scripts/python dashboard/superset/setup_dashboards.py
+.venv/Scripts/python dashboard/superset/capture_screenshots.py  # optional
+```
+
+Then open <http://localhost:8088> (login `admin / admin`) and pick a dashboard slug.
+
+### Executive recommendations
+
+A one-page CEO-printable recommendation document is at [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md). Headline verdict:
+
+> **40 % ops fix → 35 % retention → 25 % upsell.** Sequencing protects margin first, then revenue, then growth.
 
 ## Part 4 — Agentic AI / MCP ⏳
 
 Pending. Will expose the marts + ontology + NLP through an MCP server. Tools:
 `get_route_kpis`, `list_at_risk_customers`, `list_premium_upsell_candidates`, `route_complaint_themes`, etc.
+
+## Senior criteria — status after Part 3
+
+| Brief criterion | Status |
+|---|---|
+| Deliberate modeling trade-offs | ✅ Star vs DV vs hybrid; SCD2 ciblé; Superset vs Streamlit |
+| Reusable semantic layer | ✅ 24 KPIs in `_metrics.yml`, consumed by every chart |
+| Ontology-inspired inference | ✅ 5 concepts feed the Decision Layer page directly |
+| Robust AI tooling | ⏳ Pending Part 4 |
+| Strong documentation | ✅ 10 docs in `/docs` + dbt docs site + dashboard design rationale |
 
 ## Decisions log
 
@@ -123,3 +181,5 @@ Pending. Will expose the marts + ontology + NLP through an MCP server. Tools:
 - `docs/06_semantic_layer.md` — entities + 24 KPIs mapping
 - `docs/07_ontology.md` — 5 concepts + acceptance-question mapping
 - `docs/08_nlp_pipeline.md` — NLP step-by-step + lexicons + limits
+- `docs/09_dashboard_design.md` — Superset/DuckDB stack, per-page rationale, 5 bugs fixed
+- `docs/10_executive_recommendations.md` — one-page CEO printable

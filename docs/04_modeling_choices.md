@@ -86,5 +86,5 @@ ont_irops_heavy_route               ←  fct_flights + dim_route
 | Staging | 14 views | (passthrough) |
 | Intermediate | 12 (ephemeral + table) | ~1.5M (NLP + perf agg) |
 | Marts | 11 (6 dim + 5 fct) | ~1.1M bookings, 8.7k flights, 3k feedback |
-| Ontology | 5 concepts | 20 + 2 + 48 + 22 + 1 |
+| Ontology | 5 concepts | 20 + 2 + 48 + 22 + 5 |
 | Tests | 116 generic + 3 singular | 160 PASS / 0 FAIL |
