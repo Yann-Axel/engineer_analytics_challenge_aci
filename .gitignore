@@ -1,3 +1,9 @@
+# =============================================================================
+# .gitignore — Analytics Engineer Challenge (Air Côte d'Ivoire)
+# Goal: only ship the deliverables to the recruiter. Anything that is
+# regenerable, local, machine-specific, or sensitive stays out of git.
+# =============================================================================
+
 # ---------- Python ----------
 __pycache__/
 *.py[cod]
@@ -15,20 +21,34 @@ venv/
 .venv/
 env/
 ENV/
+.venv-requirements-snapshot.txt
+
+# ---------- Test / lint caches ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
 
 # ---------- Generated data (regenerated via scripts/run_all.py) ----------
 data/enriched/*
 !data/enriched/.gitkeep
 
-# ---------- DuckDB / dbt artefacts ----------
+# ---------- DuckDB / dbt artefacts (regenerated via `dbt build`) ----------
 *.duckdb
 *.duckdb.wal
 *.duckdb.tmp
+*.duckdb-shm
+*.duckdb-wal
 dbt/target/
 dbt/dbt_packages/
+dbt/dbt_internal_packages/
 dbt/logs/
 dbt/.user.yml
-# Note: dbt/profiles.yml is NOT ignored — see dbt/.gitignore comment.
+# Note: dbt/profiles.yml IS committed — DuckDB path only, no secrets.
 
 # ---------- Notebooks ----------
 .ipynb_checkpoints/
@@ -51,5 +71,11 @@ desktop.ini
 # ---------- Secrets ----------
 .env
 .env.local
+.env.*.local
 *.key
+*.pem
 secrets/
+
+# ---------- Superset local runtime (docker volumes, instance data) ----------
+dashboard/superset/superset_home/
+dashboard/superset/.docker/
