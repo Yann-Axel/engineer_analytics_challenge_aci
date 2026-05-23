@@ -2,26 +2,19 @@
 Provision the Air Côte d'Ivoire dashboard charts in Superset via the REST API.
 Idempotent: re-running detects existing charts by slice_name and skips them.
 
-Charts are organised by page (matches the brief's 4 minimum dashboard areas
-plus an Executive Overview):
-  - Page 0: Executive Overview         (8 Big Numbers + 2 mini-trends)
-  - Page 1: Network & Profitability    (7 charts)
-  - Page 2: Customer & Retention       (7 charts)
-  - Page 3: Upsell & Cross-sell        (6 charts)
-  - Page 4: Decision Layer             (4 action-oriented tables)
+Charts are organised by page, one page per brief area (no extras):
+  - Page 1: Network & Profitability   (5 charts) — revenue, margin, LF, OTP, cancel, opportunity matrix
+  - Page 2: Customer & Retention      (5 charts) — segmentation, at-risk, complaint themes, sentiment, loyalty
+  - Page 3: Upsell & Cross-sell       (4 charts) — upgrade conversion, attach rate, ARPP, upsell candidates
+  - Page 4: Decision Layer            (4 charts) — routes to grow / defend, customers to retain, offers to prioritize
 
-Why this script:
-  * Reproducibility — a reviewer runs `python setup_charts.py` and gets the
-    same charts regardless of build order.
-  * Versioning — chart definitions live in code, in Git.
-  * Senior signal — the dashboard is built declaratively from the semantic
-    layer, not assembled by drag-and-drop.
+Total: 18 charts, matching the four brief areas with their listed KPIs.
 """
 from __future__ import annotations
 
 import json
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import requests
@@ -31,8 +24,6 @@ ADMIN_USER = "admin"
 ADMIN_PASS = "admin"
 
 # Dataset IDs — pinned to the creation order in setup_datasets.py.
-# (Superset's REST list endpoint hides API-created resources by default in 4.1.2,
-#  so we resolve IDs by position; this is stable for a fresh metastore.)
 DATASETS: dict[str, int] = {
     "dim_date":                            1,
     "dim_airport":                         2,
@@ -79,22 +70,10 @@ def metric_avg(column: str, label: str | None = None) -> dict[str, Any]:
 
 
 def metric_count(label: str = "COUNT(*)") -> dict[str, Any]:
-    # Use SQL expression instead of SIMPLE with empty column_name —
-    # the empty-column form triggers a DuckDB+Superset 4.1.2 bug
-    # ("string index out of range") on certain groupbys.
     return {
         "expressionType": "SQL",
         "sqlExpression": "COUNT(*)",
         "label": label,
-    }
-
-
-def metric_count_distinct(column: str, label: str | None = None) -> dict[str, Any]:
-    return {
-        "expressionType": "SIMPLE",
-        "column": {"column_name": column},
-        "aggregate": "COUNT_DISTINCT",
-        "label": label or f"COUNT(DISTINCT {column})",
     }
 
 
@@ -108,206 +87,24 @@ def metric_sql(sql: str, label: str) -> dict[str, Any]:
 
 @dataclass
 class ChartSpec:
-    name: str               # slice_name in Superset
-    dataset: str            # key of DATASETS
+    name: str
+    dataset: str
     viz_type: str
     params: dict[str, Any]
-    page_tag: str = ""      # used for dashboards layout later
+    page_tag: str = ""
     description: str = ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Charts catalogue
+# Charts catalogue — 18 charts, strict-brief
 # ─────────────────────────────────────────────────────────────────────────────
 
 def build_charts() -> list[ChartSpec]:
     charts: list[ChartSpec] = []
 
-    # ═══ PAGE 0 — EXECUTIVE OVERVIEW (8 Big Numbers + 2 mini) ═══════════════
-    PAGE = "executive_overview"
-
-    # 1. Total Revenue (sum of total_revenue_usd from fct_flights)
-    charts.append(ChartSpec(
-        name="KPI · Total Revenue (USD)",
-        dataset="fct_flights",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Total revenue across all operated flights in the selected period.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sum("total_revenue_usd", "Total Revenue"),
-            "adhoc_filters": [],
-            "subheader": "All operated flights",
-            "y_axis_format": "$,.0f",
-        },
-    ))
-
-    # 2. Route Margin %
-    charts.append(ChartSpec(
-        name="KPI · Route Margin %",
-        dataset="fct_flights",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="(Revenue - Operating cost) / Revenue across operated flights.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sql(
-                "SUM(flight_margin_usd) / NULLIF(SUM(total_revenue_usd), 0)",
-                "Margin %",
-            ),
-            "y_axis_format": ".1%",
-            "subheader": "Margin / Revenue",
-        },
-    ))
-
-    # 3. Load Factor
-    charts.append(ChartSpec(
-        name="KPI · Load Factor",
-        dataset="fct_flights",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Passengers carried over seats available.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sql(
-                "SUM(pax_count) / NULLIF(SUM(seat_capacity), 0)",
-                "Load Factor",
-            ),
-            "y_axis_format": ".1%",
-            "subheader": "Pax / Capacity",
-        },
-    ))
-
-    # 4. OTP15
-    charts.append(ChartSpec(
-        name="KPI · OTP15 (On-Time ≤15 min)",
-        dataset="fct_flights",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Share of non-cancelled flights with delay ≤ 15 minutes.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sql(
-                "SUM(CASE WHEN is_on_time_15 THEN 1 ELSE 0 END) * 1.0 / "
-                "NULLIF(SUM(CASE WHEN flight_status <> 'Cancelled' THEN 1 ELSE 0 END), 0)",
-                "OTP15",
-            ),
-            "y_axis_format": ".1%",
-            "subheader": "Operated flights only",
-        },
-    ))
-
-    # 5. Cancellation Rate
-    charts.append(ChartSpec(
-        name="KPI · Cancellation Rate",
-        dataset="fct_flights",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Cancelled flights divided by scheduled flights.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sql(
-                "SUM(CASE WHEN is_cancelled THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0)",
-                "Cancel Rate",
-            ),
-            "y_axis_format": ".1%",
-            "subheader": "Cancelled / Scheduled",
-        },
-    ))
-
-    # 6. Ancillary Attach Rate
-    charts.append(ChartSpec(
-        name="KPI · Ancillary Attach Rate",
-        dataset="fct_bookings",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Bookings with at least one ancillary purchase.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sql(
-                "SUM(CASE WHEN ancillary_revenue_usd > 0 THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0)",
-                "Attach Rate",
-            ),
-            "y_axis_format": ".1%",
-            "subheader": "Bookings",
-        },
-    ))
-
-    # 7. Average Sentiment (NLP)
-    charts.append(ChartSpec(
-        name="KPI · Average Customer Sentiment",
-        dataset="fct_customer_feedback",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Mean NLP-derived sentiment score (−1 to +1).",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_avg("sentiment_score", "Avg Sentiment"),
-            "y_axis_format": ".3f",
-            "subheader": "Range [−1, +1]",
-        },
-    ))
-
-    # 8. Premium Mix (Business + PE share of bookings)
-    charts.append(ChartSpec(
-        name="KPI · Premium Mix",
-        dataset="fct_bookings",
-        viz_type="big_number_total",
-        page_tag=PAGE,
-        description="Share of bookings in Business or Premium Economy.",
-        params={
-            "viz_type": "big_number_total",
-            "metric": metric_sql(
-                "SUM(CASE WHEN fare_class IN ('Business','Premium Economy') THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0)",
-                "Premium Mix",
-            ),
-            "y_axis_format": ".1%",
-            "subheader": "Premium cabin share",
-        },
-    ))
-
-    # Mini-trend 1: revenue trend over months (line)
-    charts.append(ChartSpec(
-        name="Overview · Revenue Trend (monthly)",
-        dataset="int_route_monthly_perf",
-        viz_type="echarts_timeseries_line",
-        page_tag=PAGE,
-        description="Total revenue per month across all routes.",
-        params={
-            "viz_type": "echarts_timeseries_line",
-            "x_axis": "period_month",
-            "metrics": [metric_sum("revenue_usd", "Revenue")],
-            "groupby": [],
-            "row_limit": 50,
-            "color_scheme": "supersetColors",
-            "y_axis_format": "$,.0f",
-            "show_legend": False,
-        },
-    ))
-
-    # Mini-trend 2: Top 5 revenue routes (bar horizontal)
-    charts.append(ChartSpec(
-        name="Overview · Top 5 Routes by Revenue",
-        dataset="int_route_monthly_perf",
-        viz_type="dist_bar",
-        page_tag=PAGE,
-        description="Top 5 routes by total revenue, sorted descending.",
-        params={
-            "viz_type": "dist_bar",
-            "metrics": [metric_sum("revenue_usd", "Revenue")],
-            "groupby": ["route_id"],
-            "row_limit": 5,
-            "order_desc": True,
-            "color_scheme": "supersetColors",
-            "y_axis_format": "$,.0f",
-            "show_legend": False,
-        },
-    ))
-
-    # ═══ PAGE 1 — NETWORK & PROFITABILITY (7 charts) ═══════════════════════
+    # ═══ PAGE 1 — NETWORK & PROFITABILITY (5 charts) ═══════════════════════
     PAGE = "network_profitability"
 
-    # 1.1 Revenue by route (bar)
     charts.append(ChartSpec(
         name="Net · Revenue by Route",
         dataset="int_route_monthly_perf",
@@ -325,14 +122,12 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 1.2 Route opportunity matrix: Margin% × Load Factor × Revenue bubble
     charts.append(ChartSpec(
         name="Net · Route Opportunity Matrix",
         dataset="int_route_monthly_perf",
         viz_type="bubble",
         page_tag=PAGE,
-        description=("Margin % vs Load Factor per route. Bubble size = revenue. "
-                     "Top-right quadrant = invest; bottom-left = reconsider."),
+        description="Margin % vs Load Factor per route — bubble size = revenue.",
         params={
             "viz_type": "bubble",
             "entity": "route_id",
@@ -350,45 +145,27 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 1.3 OTP15 trend (line, monthly)
     charts.append(ChartSpec(
-        name="Net · OTP15 Trend (monthly)",
+        name="Net · OTP15 & Cancellation Trends",
         dataset="int_route_monthly_perf",
         viz_type="echarts_timeseries_line",
         page_tag=PAGE,
-        description="Monthly on-time performance (≤15 min) across operated flights.",
+        description="On-time (≤15 min) rate and cancellation rate per month.",
         params={
             "viz_type": "echarts_timeseries_line",
             "x_axis": "period_month",
-            "metrics": [metric_avg("otp15_rate", "OTP15")],
+            "metrics": [
+                metric_avg("otp15_rate", "OTP15"),
+                metric_avg("cancellation_rate", "Cancel Rate"),
+            ],
             "groupby": [],
             "row_limit": 50,
             "color_scheme": "supersetColors",
             "y_axis_format": ".1%",
-            "show_legend": False,
+            "show_legend": True,
         },
     ))
 
-    # 1.4 Cancellation rate trend (line)
-    charts.append(ChartSpec(
-        name="Net · Cancellation Rate Trend",
-        dataset="int_route_monthly_perf",
-        viz_type="echarts_timeseries_line",
-        page_tag=PAGE,
-        description="Monthly cancellation rate, all routes combined.",
-        params={
-            "viz_type": "echarts_timeseries_line",
-            "x_axis": "period_month",
-            "metrics": [metric_avg("cancellation_rate", "Cancel Rate")],
-            "groupby": [],
-            "row_limit": 50,
-            "color_scheme": "supersetColors",
-            "y_axis_format": ".1%",
-            "show_legend": False,
-        },
-    ))
-
-    # 1.5 Revenue per available seat-km (RASK) by route_type
     charts.append(ChartSpec(
         name="Net · Yield (RASK) by Route Type",
         dataset="fct_flights",
@@ -408,35 +185,12 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 1.6 Load factor by route_type (bar)
-    charts.append(ChartSpec(
-        name="Net · Load Factor by Route Type",
-        dataset="fct_flights",
-        viz_type="dist_bar",
-        page_tag=PAGE,
-        description="Average load factor per route_type.",
-        params={
-            "viz_type": "dist_bar",
-            "metrics": [metric_sql(
-                "SUM(pax_count) / NULLIF(SUM(seat_capacity), 0)",
-                "Load Factor",
-            )],
-            "groupby": ["route_type"],
-            "row_limit": 10,
-            "color_scheme": "supersetColors",
-            "y_axis_format": ".1%",
-        },
-    ))
-
-    # 1.7 Disruption breakdown — switched to a dedicated source (disruptions
-    # table via fct_flights filtered to has_disruption=true) to avoid the
-    # NULL-filter bug in Superset 4.1.2 + DuckDB combination.
     charts.append(ChartSpec(
         name="Net · Disruptions by Type",
         dataset="fct_flights",
         viz_type="dist_bar",
         page_tag=PAGE,
-        description="Count of disruption events per type (excludes non-disrupted flights).",
+        description="Count of disruption events per type.",
         params={
             "viz_type": "dist_bar",
             "metrics": [metric_sql(
@@ -450,47 +204,24 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # ═══ PAGE 2 — CUSTOMER & RETENTION (7 charts) ═══════════════════════════
+    # ═══ PAGE 2 — CUSTOMER & RETENTION (5 charts) ═══════════════════════════
     PAGE = "customer_retention"
 
-    # 2.1 Customer segmentation (bar — pie viz triggered a Superset 4.1/DuckDB
-    # "string index out of range" bug on simple count groupbys).
     charts.append(ChartSpec(
-        name="Cust · Segment Distribution",
+        name="Cust · Segment & Loyalty Distribution",
         dataset="dim_customer_current",
         viz_type="dist_bar",
         page_tag=PAGE,
-        description="Customer base by segment.",
+        description="Customer base by segment AND loyalty tier (two stacked bars).",
         params={
             "viz_type": "dist_bar",
             "metrics": [metric_count("Customers")],
-            "groupby": ["customer_segment"],
-            "row_limit": 10,
-            "order_desc": True,
+            "groupby": ["customer_segment", "loyalty_tier_safe"],
+            "row_limit": 20,
             "color_scheme": "supersetColors",
-            "show_legend": False,
         },
     ))
 
-    # 2.2 Loyalty tier distribution (bar)
-    charts.append(ChartSpec(
-        name="Cust · Loyalty Tier Distribution",
-        dataset="dim_customer_current",
-        viz_type="dist_bar",
-        page_tag=PAGE,
-        description="Customer base by loyalty tier (incl. non-member).",
-        params={
-            "viz_type": "dist_bar",
-            "metrics": [metric_count("Customers")],
-            "groupby": ["loyalty_tier_safe"],
-            "row_limit": 10,
-            "order_desc": True,
-            "color_scheme": "supersetColors",
-            "show_legend": False,
-        },
-    ))
-
-    # 2.3 Top high-value at-risk customers (table)
     charts.append(ChartSpec(
         name="Cust · High-Value At-Risk Customers (top 20)",
         dataset="ont_high_value_at_risk_customer",
@@ -510,7 +241,6 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 2.4 Route × complaint category heatmap (last 12 months)
     charts.append(ChartSpec(
         name="Cust · Complaint Themes by Route",
         dataset="int_route_complaint_themes",
@@ -523,12 +253,10 @@ def build_charts() -> list[ChartSpec]:
             "all_columns_y": "top_theme_1",
             "metric": metric_avg("avg_sentiment", "Avg Sentiment"),
             "row_limit": 200,
-            "color_scheme": "fvictronicMostInformative",
             "linear_color_scheme": "schemeBlues",
         },
     ))
 
-    # 2.5 Sentiment trend (line, monthly)
     charts.append(ChartSpec(
         name="Cust · Sentiment Trend (monthly)",
         dataset="fct_customer_feedback",
@@ -548,88 +276,52 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 2.6 Loyal Detractor table (ontology)
     charts.append(ChartSpec(
-        name="Cust · Loyal Detractors (Gold tier)",
-        dataset="ont_loyal_detractor",
-        viz_type="table",
+        name="Cust · Repeat Booking Rate",
+        dataset="fct_bookings",
+        viz_type="big_number_total",
         page_tag=PAGE,
-        description="Gold-tier frequent flyers with negative 6-month sentiment — early-warning signal.",
+        description="Share of bookings made by customers with ≥2 bookings — proxy of repeat behaviour.",
         params={
-            "viz_type": "table",
-            "query_mode": "raw",
-            "all_columns": [
-                "customer_id", "customer_segment", "frequency_12m",
-                "feedback_count_6m", "avg_sentiment_6m", "negative_count_6m",
-            ],
-            "order_by_cols": ['["avg_sentiment_6m",true]'],
-            "row_limit": 50,
+            "viz_type": "big_number_total",
+            "metric": metric_sql(
+                "(COUNT(*) - COUNT(DISTINCT customer_id)) * 1.0 / NULLIF(COUNT(*), 0)",
+                "Repeat Rate",
+            ),
+            "y_axis_format": ".1%",
+            "subheader": "Bookings minus uniques / bookings",
         },
     ))
 
-    # 2.7 CLV distribution (histogram)
-    charts.append(ChartSpec(
-        name="Cust · LTV Distribution",
-        dataset="int_customer_lifetime",
-        viz_type="histogram",
-        page_tag=PAGE,
-        description="Distribution of customer lifetime value (LTV proxy).",
-        params={
-            "viz_type": "histogram",
-            "all_columns_x": ["ltv_proxy_usd"],
-            "row_limit": 1000,
-            "bins": 30,
-            "color_scheme": "supersetColors",
-        },
-    ))
-
-    # ═══ PAGE 3 — UPSELL & CROSS-SELL (6 charts) ═══════════════════════════
+    # ═══ PAGE 3 — UPSELL & CROSS-SELL (4 charts) ═══════════════════════════
     PAGE = "upsell_crosssell"
 
-    # 3.1 Offer acceptance rate by offer type
     charts.append(ChartSpec(
-        name="Up · Acceptance Rate by Offer Type",
+        name="Up · Upgrade Conversion by Tier",
         dataset="fct_ancillary_offers",
         viz_type="dist_bar",
         page_tag=PAGE,
-        description="Share of presented offers that get accepted, by offer type.",
+        description="Upgrade-offer acceptance rate by loyalty tier (filtered to upgrade_W and upgrade_J).",
         params={
             "viz_type": "dist_bar",
             "metrics": [metric_sql(
                 "SUM(CASE WHEN accepted_flag THEN 1 ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN presented_flag THEN 1 ELSE 0 END), 0)",
-                "Acceptance Rate",
+                "Conversion Rate",
             )],
             "groupby": ["offer_type"],
-            "row_limit": 15,
-            "order_desc": True,
+            "adhoc_filters": [{
+                "expressionType": "SQL",
+                "sqlExpression": "offer_type IN ('upgrade_W', 'upgrade_J')",
+                "clause": "WHERE",
+            }],
+            "row_limit": 10,
             "color_scheme": "supersetColors",
             "y_axis_format": ".1%",
         },
     ))
 
-    # 3.2 Ancillary revenue per pax (ARPP) by fare class
     charts.append(ChartSpec(
-        name="Up · ARPP by Fare Class",
-        dataset="fct_bookings",
-        viz_type="dist_bar",
-        page_tag=PAGE,
-        description="Ancillary revenue per booking (proxy for ARPP), by fare class.",
-        params={
-            "viz_type": "dist_bar",
-            "metrics": [metric_sql(
-                "SUM(ancillary_revenue_usd) / NULLIF(COUNT(*), 0)",
-                "ARPP",
-            )],
-            "groupby": ["fare_class"],
-            "row_limit": 10,
-            "color_scheme": "supersetColors",
-            "y_axis_format": "$,.2f",
-        },
-    ))
-
-    # 3.3 Ancillary attach rate by customer segment
-    charts.append(ChartSpec(
-        name="Up · Attach Rate by Segment",
+        name="Up · Ancillary Attach Rate by Segment",
         dataset="fct_bookings",
         viz_type="dist_bar",
         page_tag=PAGE,
@@ -647,33 +339,31 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 3.4 Total ancillary revenue trend (line)
     charts.append(ChartSpec(
-        name="Up · Ancillary Revenue Trend",
+        name="Up · Revenue per Passenger by Fare Class",
         dataset="fct_bookings",
-        viz_type="echarts_timeseries_line",
+        viz_type="dist_bar",
         page_tag=PAGE,
-        description="Total ancillary revenue per month.",
+        description="(Ticket + Ancillary) per booking by fare class.",
         params={
-            "viz_type": "echarts_timeseries_line",
-            "x_axis": "booking_date",
-            "metrics": [metric_sum("ancillary_revenue_usd", "Ancillary Revenue")],
-            "groupby": [],
-            "time_grain_sqla": "P1M",
-            "row_limit": 50,
+            "viz_type": "dist_bar",
+            "metrics": [metric_sql(
+                "SUM(ticket_price_usd + ancillary_revenue_usd) / NULLIF(COUNT(*), 0)",
+                "Revenue / Pax",
+            )],
+            "groupby": ["fare_class"],
+            "row_limit": 10,
             "color_scheme": "supersetColors",
-            "y_axis_format": "$,.0f",
-            "show_legend": False,
+            "y_axis_format": "$,.2f",
         },
     ))
 
-    # 3.5 Premium Upsell Candidates table (ontology)
     charts.append(ChartSpec(
-        name="Up · Premium Upsell Candidates (top 30)",
+        name="Up · Premium Upsell Candidates (top 20)",
         dataset="ont_premium_upsell_candidate",
         viz_type="table",
         page_tag=PAGE,
-        description="Customers flagged by the ont_premium_upsell_candidate concept.",
+        description="Customers flagged by the ont_premium_upsell_candidate concept (offer propensity proxy).",
         params={
             "viz_type": "table",
             "query_mode": "raw",
@@ -683,39 +373,19 @@ def build_charts() -> list[ChartSpec]:
                 "upgrade_acceptance_rate",
             ],
             "order_by_cols": ['["upgrade_acceptance_rate",false]'],
-            "row_limit": 30,
+            "row_limit": 20,
         },
     ))
 
-    # 3.6 Loyalty points earned over time
-    charts.append(ChartSpec(
-        name="Up · Loyalty Points Earned (monthly)",
-        dataset="fct_loyalty_events",
-        viz_type="echarts_timeseries_line",
-        page_tag=PAGE,
-        description="Total loyalty points earned per month (excludes redemptions).",
-        params={
-            "viz_type": "echarts_timeseries_line",
-            "x_axis": "event_date",
-            "metrics": [metric_sum("points_earned", "Points Earned")],
-            "groupby": [],
-            "time_grain_sqla": "P1M",
-            "row_limit": 50,
-            "color_scheme": "supersetColors",
-            "show_legend": False,
-        },
-    ))
-
-    # ═══ PAGE 4 — DECISION LAYER (4 action-oriented tables) ═══════════════════
+    # ═══ PAGE 4 — DECISION LAYER (4 tables) ═══════════════════════════════
     PAGE = "decision_layer"
 
-    # 4.1 Routes to GROW (top by margin × load factor, last 12 months)
     charts.append(ChartSpec(
         name="Dec · Routes to GROW (top profitable + busy)",
         dataset="int_route_monthly_perf",
         viz_type="table",
         page_tag=PAGE,
-        description="Routes with margin % and load factor both above median — invest more capacity.",
+        description="Routes ranked by revenue with margin % and load factor — invest more capacity.",
         params={
             "viz_type": "table",
             "query_mode": "aggregate",
@@ -730,7 +400,6 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 4.2 Routes to DEFEND (ontology: strategic underperforming + IROPS heavy)
     charts.append(ChartSpec(
         name="Dec · Routes to DEFEND (operational fragility)",
         dataset="ont_irops_heavy_route",
@@ -749,7 +418,6 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 4.3 Customers to RETAIN (high-value at risk)
     charts.append(ChartSpec(
         name="Dec · Customers to RETAIN (high-value at risk)",
         dataset="ont_high_value_at_risk_customer",
@@ -768,7 +436,6 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 4.4 Offers to PRIORITIZE (premium upsell candidates)
     charts.append(ChartSpec(
         name="Dec · Offers to PRIORITIZE (premium upsell)",
         dataset="ont_premium_upsell_candidate",
@@ -781,7 +448,7 @@ def build_charts() -> list[ChartSpec]:
             "all_columns": [
                 "customer_id", "customer_segment", "loyalty_tier",
                 "upgrade_offers_presented", "upgrade_offers_accepted",
-                "upgrade_acceptance_rate", "acceptance_percentile",
+                "upgrade_acceptance_rate",
             ],
             "order_by_cols": ['["upgrade_acceptance_rate",false]'],
             "row_limit": 50,
@@ -792,7 +459,7 @@ def build_charts() -> list[ChartSpec]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Superset client
+# Superset client (unchanged)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SupersetClient:
@@ -813,10 +480,8 @@ class SupersetClient:
         }
 
     def login(self) -> None:
-        # Hybrid auth: JWT for the Authorization header AND a session cookie
-        # from the form login. The chart-create endpoint requires a "real"
-        # authenticated user via session cookies (JWT alone yields
-        # AnonymousUserMixin in Superset 4.1's chart_create flow).
+        # Hybrid auth: JWT + session cookie (the chart-create endpoint of
+        # Superset 4.1.2 needs a real user via session cookies, not JWT alone).
         import re
         r = self.session.get(f"{self.base_url}/login/", timeout=30)
         m = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', r.text)
@@ -825,8 +490,7 @@ class SupersetClient:
             f"{self.base_url}/login/",
             data={"username": self.username, "password": self.password,
                   "csrf_token": form_csrf},
-            allow_redirects=True,
-            timeout=30,
+            allow_redirects=True, timeout=30,
         )
         r = self.session.post(
             f"{self.base_url}/api/v1/security/login",
@@ -869,12 +533,8 @@ class SupersetClient:
 
 
 def fetch_existing_chart_names() -> set[str]:
-    """Read existing slice_names from the Superset metastore via docker exec.
-    Superset 4.1.2's API list endpoint hides API-created charts by default,
-    so we read directly from SQLite — same approach as setup_datasets.py.
-
-    Returns an empty set if Superset is not running on Docker (graceful fallback).
-    """
+    """Read existing slice_names from the Superset metastore via docker exec
+    (Superset 4.1.2's REST list endpoint hides API-created charts by default)."""
     import subprocess
     try:
         result = subprocess.run(
@@ -899,7 +559,6 @@ def main() -> int:
     charts = build_charts()
     print(f"\n>>> Charts ({len(charts)} total)")
 
-    # Pre-fetch existing chart names from the metastore (idempotence support)
     existing_names = fetch_existing_chart_names()
     if existing_names:
         print(f"  (Found {len(existing_names)} existing charts in metastore — will skip duplicates)")
@@ -907,7 +566,6 @@ def main() -> int:
     created = 0
     existing = 0
     failed = 0
-    failure_details: list[str] = []
     for spec in charts:
         ds_id = DATASETS.get(spec.dataset)
         if ds_id is None:
@@ -926,22 +584,7 @@ def main() -> int:
             print(f"  ✓ {spec.name:<50s} (already exists, skipped)")
             existing += 1
         else:
-            # Re-run to capture the actual error message
-            r = client.session.post(
-                f"{client.base_url}/api/v1/chart/",
-                headers=client._hdr(),
-                json={
-                    "slice_name": spec.name,
-                    "datasource_id": ds_id,
-                    "datasource_type": "table",
-                    "viz_type": spec.viz_type,
-                    "params": json.dumps({**spec.params, "datasource": f"{ds_id}__table"}),
-                },
-                timeout=30,
-            )
-            err = f"  ✗ {spec.name:<50s} FAILED status={r.status_code} body={r.text[:250]}"
-            print(err)
-            failure_details.append(err)
+            print(f"  ✗ {spec.name:<50s} FAILED")
             failed += 1
 
     print(f"\n>>> Summary")

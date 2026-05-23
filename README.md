@@ -69,55 +69,23 @@ Run: `cd dbt && dbt build` → **160 / 160 tests PASS in ~12 s**.
 
 ## Part 3 — Executive Growth Allocation Dashboard ✅
 
-**Status: 5 dashboards × 34 charts, all rendered and screenshot-captured.**
+The brief asks for one dashboard covering four areas, with screenshots and a one-page recommendation. Here is how each requirement is met:
 
-### Stack
-
-Apache Superset 4.1.2 in Docker, reading `dbt/airline.duckdb` via `duckdb-engine`. All 34 charts and 5 dashboards are provisioned via the REST API by versioned Python scripts — **zero drag-and-drop**, fully reproducible.
-
-### 5 dashboards
-
-| # | Slug | Charts | Highlight |
-|---|---|---:|---|
-| 0 | `executive-overview` | 10 | 8 KPI Big Numbers + Revenue trend |
-| 1 | `network-profitability` | 7 | **Route Opportunity Matrix** (bubble, hero) |
-| 2 | `customer-retention` | 7 | **Complaint themes heatmap** (route × category × sentiment) |
-| 3 | `upsell-crosssell` | 6 | Acceptance / ARPP / attach + Premium candidates table |
-| 4 | `decision-layer` | 4 | **4 action tables** fed by the ontology (Grow / Defend / Retain / Prioritize) |
-
-### Screenshots (in `docs/screenshots/`)
-
-| Page | Capture |
+| Brief requirement | Deliverable |
 |---|---|
-| 0. Executive Overview | [00_executive_overview.png](docs/screenshots/00_executive_overview.png) |
-| 1. Network & Profitability | [01_network_profitability.png](docs/screenshots/01_network_profitability.png) |
-| 2. Customer & Retention | [02_customer_retention.png](docs/screenshots/02_customer_retention.png) |
-| 3. Upsell & Cross-sell | [03_upsell_crosssell.png](docs/screenshots/03_upsell_crosssell.png) |
-| 4. Decision Layer | [04_decision_layer.png](docs/screenshots/04_decision_layer.png) |
+| Build an Executive Growth Allocation Dashboard | Apache Superset 4.1.2 in Docker, reading `dbt/airline.duckdb` |
+| Network & profitability area | [`network-profitability`](docs/screenshots/01_network_profitability.png) — 5 charts (revenue, opportunity matrix, OTP/cancel trends, RASK, disruptions) |
+| Customer & retention area | [`customer-retention`](docs/screenshots/02_customer_retention.png) — 5 charts (segment/loyalty, at-risk, complaint heatmap, sentiment trend, repeat rate) |
+| Upsell & cross-sell area | [`upsell-crosssell`](docs/screenshots/03_upsell_crosssell.png) — 4 charts (upgrade conv, attach, rev/pax, premium candidates) |
+| Decision layer | [`decision-layer`](docs/screenshots/04_decision_layer.png) — 4 ontology-driven tables (Grow / Defend / Retain / Prioritise) |
+| Screenshots | [docs/screenshots/](docs/screenshots/) — 4 PNG (one per area) |
+| One page of executive recommendations | [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md) — A4-printable verdict + 3 actions + 90-day KPI targets |
 
-Captures produced by Playwright headless Chromium — fully reproducible (`dashboard/superset/capture_screenshots.py`).
+**Total: 4 dashboards × 18 charts**, all provisioned via the REST API by versioned Python scripts (`dashboard/superset/setup_*.py`). Design rationale: [docs/09_dashboard_design.md](docs/09_dashboard_design.md).
 
-### Spin-up commands
+Spin-up commands in [docs/09_dashboard_design.md §3](docs/09_dashboard_design.md). Headline verdict from the recommendation doc:
 
-```bash
-cd dashboard/superset
-docker compose up -d
-bash bootstrap.sh                                    # one-off admin user + perms
-cd ../..
-.venv/Scripts/python dashboard/superset/setup_datasets.py
-.venv/Scripts/python dashboard/superset/configure_datetime_columns.py
-.venv/Scripts/python dashboard/superset/setup_charts.py
-.venv/Scripts/python dashboard/superset/setup_dashboards.py
-.venv/Scripts/python dashboard/superset/capture_screenshots.py  # optional
-```
-
-Then open <http://localhost:8088> (login `admin / admin`) and pick a dashboard slug.
-
-### Executive recommendations
-
-A one-page CEO-printable recommendation document is at [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md). Headline verdict:
-
-> **40 % ops fix → 35 % retention → 25 % upsell.** Sequencing protects margin first, then revenue, then growth.
+> **40 % ops fix → 35 % retention → 25 % upsell.** Recover margin first, then protect revenue, then grow it.
 
 ## Part 4 — Agentic AI / MCP server ✅
 

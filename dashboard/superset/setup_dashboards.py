@@ -43,71 +43,49 @@ class DashboardSpec:
 
 DASHBOARDS: list[DashboardSpec] = [
     DashboardSpec(
-        title="0 · Executive Overview",
-        slug="executive-overview",
-        chart_names=[
-            "KPI · Total Revenue (USD)", "KPI · Route Margin %",
-            "KPI · Load Factor", "KPI · OTP15 (On-Time ≤15 min)",
-            "KPI · Cancellation Rate", "KPI · Ancillary Attach Rate",
-            "KPI · Average Customer Sentiment", "KPI · Premium Mix",
-            "Overview · Revenue Trend (monthly)",
-            "Overview · Top 5 Routes by Revenue",
-        ],
-        rows_layout=[
-            ("kpi_row", ["KPI · Total Revenue (USD)", "KPI · Route Margin %",
-                         "KPI · Load Factor", "KPI · OTP15 (On-Time ≤15 min)"]),
-            ("kpi_row", ["KPI · Cancellation Rate", "KPI · Ancillary Attach Rate",
-                         "KPI · Average Customer Sentiment", "KPI · Premium Mix"]),
-            ("two_col", ["Overview · Revenue Trend (monthly)",
-                         "Overview · Top 5 Routes by Revenue"]),
-        ],
-    ),
-    DashboardSpec(
         title="1 · Network & Profitability",
         slug="network-profitability",
         chart_names=[
             "Net · Revenue by Route", "Net · Route Opportunity Matrix",
-            "Net · OTP15 Trend (monthly)", "Net · Cancellation Rate Trend",
-            "Net · Yield (RASK) by Route Type", "Net · Load Factor by Route Type",
+            "Net · OTP15 & Cancellation Trends",
+            "Net · Yield (RASK) by Route Type",
             "Net · Disruptions by Type",
         ],
         rows_layout=[
             ("one_col", ["Net · Route Opportunity Matrix"]),  # hero chart full-width
             ("two_col", ["Net · Revenue by Route", "Net · Disruptions by Type"]),
-            ("two_col", ["Net · OTP15 Trend (monthly)", "Net · Cancellation Rate Trend"]),
-            ("two_col", ["Net · Yield (RASK) by Route Type", "Net · Load Factor by Route Type"]),
+            ("two_col", ["Net · OTP15 & Cancellation Trends", "Net · Yield (RASK) by Route Type"]),
         ],
     ),
     DashboardSpec(
         title="2 · Customer & Retention",
         slug="customer-retention",
         chart_names=[
-            "Cust · Segment Distribution", "Cust · Loyalty Tier Distribution",
+            "Cust · Segment & Loyalty Distribution",
             "Cust · High-Value At-Risk Customers (top 20)",
-            "Cust · Complaint Themes by Route", "Cust · Sentiment Trend (monthly)",
-            "Cust · Loyal Detractors (Gold tier)", "Cust · LTV Distribution",
+            "Cust · Complaint Themes by Route",
+            "Cust · Sentiment Trend (monthly)",
+            "Cust · Repeat Booking Rate",
         ],
         rows_layout=[
-            ("two_col", ["Cust · Segment Distribution", "Cust · Loyalty Tier Distribution"]),
+            ("two_col", ["Cust · Segment & Loyalty Distribution", "Cust · Repeat Booking Rate"]),
             ("one_col", ["Cust · High-Value At-Risk Customers (top 20)"]),
             ("two_col", ["Cust · Complaint Themes by Route", "Cust · Sentiment Trend (monthly)"]),
-            ("two_col", ["Cust · Loyal Detractors (Gold tier)", "Cust · LTV Distribution"]),
         ],
     ),
     DashboardSpec(
         title="3 · Upsell & Cross-sell",
         slug="upsell-crosssell",
         chart_names=[
-            "Up · Acceptance Rate by Offer Type", "Up · ARPP by Fare Class",
-            "Up · Attach Rate by Segment", "Up · Ancillary Revenue Trend",
-            "Up · Premium Upsell Candidates (top 30)",
-            "Up · Loyalty Points Earned (monthly)",
+            "Up · Upgrade Conversion by Tier",
+            "Up · Ancillary Attach Rate by Segment",
+            "Up · Revenue per Passenger by Fare Class",
+            "Up · Premium Upsell Candidates (top 20)",
         ],
         rows_layout=[
-            ("two_col", ["Up · Acceptance Rate by Offer Type", "Up · ARPP by Fare Class"]),
-            ("two_col", ["Up · Attach Rate by Segment", "Up · Ancillary Revenue Trend"]),
-            ("one_col", ["Up · Premium Upsell Candidates (top 30)"]),
-            ("one_col", ["Up · Loyalty Points Earned (monthly)"]),
+            ("two_col", ["Up · Upgrade Conversion by Tier", "Up · Ancillary Attach Rate by Segment"]),
+            ("one_col", ["Up · Revenue per Passenger by Fare Class"]),
+            ("one_col", ["Up · Premium Upsell Candidates (top 20)"]),
         ],
     ),
     DashboardSpec(
