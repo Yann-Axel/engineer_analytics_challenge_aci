@@ -1,11 +1,15 @@
 {{ config(materialized='table') }}
 
 -- ONTOLOGY: IROPS-Heavy Route
--- A route whose disruption rate is in the top decile AND
--- cancellation rate exceeds 5%, signalling operational fragility
--- (vs pure demand weakness).
--- Rule:  disruption_rate_12m >= P90
---        AND cancellation_rate_12m > 0.05
+-- A route showing operational fragility: top-quintile disruption rate
+-- OR cancellation rate > 5%. We use OR (not AND) because the two failure modes
+-- are distinct: weather/tech disruptions don't always materialise as cancellations,
+-- and high cancellation rates can come from causes other than recorded disruptions.
+-- Senior choice: relative threshold (top quintile) + absolute (5%) — captures
+-- both percentile outliers and any route breaching the 5% cancellation industry
+-- "alarm" line.
+-- Rule:  disruption_percentile_12m >= 0.80   (top quintile by disruption rate)
+--        OR cancellation_rate_12m > 0.05     (cancellation alarm threshold)
 -- Owner: COO / Operations Director
 -- Refresh: weekly
 with flights_12m as (
@@ -58,5 +62,5 @@ select
     current_timestamp                  as inferred_at
 from with_rank pr
 join routes    r on pr.route_id = r.route_id
-where pr.disruption_percentile  >= 0.90
-  and pr.cancellation_rate_12m   > 0.05
+where pr.disruption_percentile  >= 0.80
+   or pr.cancellation_rate_12m   > 0.05

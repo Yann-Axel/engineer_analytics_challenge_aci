@@ -81,7 +81,7 @@ DBT_PROFILES_DIR=. ../.venv/Scripts/dbt docs serve    # open the lineage site
 | `ont_strategic_underperforming_route` | 2 | "Routes unprofitable from ops issues vs weak demand?" |
 | `ont_premium_upsell_candidate` | 48 | "Which segments should receive premium offers?" |
 | `ont_loyal_detractor` | 22 | (early-warning retention) |
-| `ont_irops_heavy_route` | 1 | "Routes losing margin to ops issues" |
+| `ont_irops_heavy_route` | 5 | "Routes losing margin to ops issues" |
 
 ### NLP integration (unstructured → structured)
 

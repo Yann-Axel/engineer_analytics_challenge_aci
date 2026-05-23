@@ -21,7 +21,7 @@ The SQL **executes** the rule (and is consumed by the dashboard and MCP). The YA
 | **StrategicUnderperformingRoute** | `is_strategic = true` AND `margin_percentile_among_strategic <= 0.50` AND `load_factor_12m >= 0.65` | 2 | VP Network | monthly |
 | **PremiumUpsellCandidate** | `customer_segment IN ('Standard','Business')` AND `loyalty_tier IN ('Silver','Gold')` AND `acceptance_percentile >= 0.75` | 48 | Ancillary Manager | monthly |
 | **LoyalDetractor** | `loyalty_tier = 'Gold'` AND `frequency_12m >= 4` AND `avg_sentiment_6m < -0.3` | 22 | Loyalty Manager | weekly |
-| **IROPSHeavyRoute** | `disruption_percentile_12m >= 0.90` AND `cancellation_rate_12m > 0.05` | 1 | COO / Ops Director | weekly |
+| **IROPSHeavyRoute** | `disruption_percentile_12m >= 0.80` OR `cancellation_rate_12m > 0.05` | 5 | COO / Ops Director | weekly |
 
 ## Acceptance-question mapping
 

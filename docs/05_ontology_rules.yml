@@ -73,14 +73,19 @@ concepts:
 
   - name: IROPSHeavyRoute
     description: |
-      A route whose disruption rate is in the top decile AND cancellation
-      rate exceeds 5%, signalling operational fragility.
+      A route showing operational fragility: top-quintile disruption rate
+      OR cancellation rate > 5%. The OR is intentional — disruptions and
+      cancellations are distinct failure modes (weather/tech disruptions
+      don't always materialise as cancellations, and high cancel rates can
+      come from causes other than recorded disruptions). Either alone
+      warrants attention from operations.
     business_owner: COO / Operations Director
     refresh_frequency: weekly
     inputs:
       - source: fct_flights
       - source: dim_route
     rule:
-      disruption_percentile_12m:  ">= 0.90"
+      logic:                       "OR"   # either condition triggers the concept
+      disruption_percentile_12m:  ">= 0.80"
       cancellation_rate_12m:      "> 0.05"
     output: ont_irops_heavy_route
