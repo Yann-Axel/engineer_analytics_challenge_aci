@@ -12,6 +12,13 @@
 
 **40 % to operations stabilisation of 5 underperforming routes, 35 % to high-value customer retention, 25 % to premium upsell activation.** Recover margin first, then protect revenue, then grow it.
 
+```mermaid
+pie showData title Budget allocation — next 12 months
+    "Operations stabilisation (40%)" : 40
+    "Customer retention (35%)" : 35
+    "Premium upsell (25%)" : 25
+```
+
 ## Three actions, prioritised
 
 | # | Action | Why | Expected impact |
@@ -39,6 +46,25 @@
 - At-risk customer count → **≤ 10** (from 20)
 - Upgrade acceptance on the 48 candidates → **≥ 20 %** (from 17 %)
 - Network OTP15 → **≥ 72 %** (from 66.5 %)
+
+```mermaid
+flowchart LR
+    subgraph A["Action 1 — Ops (40%)"]
+      A1[5 IROPS-heavy routes<br/>R015 / R005 / R008 / R004 / R006]
+      A1 --> A2[~30 cancellations avoided<br/>~$200K saved + NPS uplift]
+    end
+    subgraph B["Action 2 — Retention (35%)"]
+      B1[20 high-value at-risk customers<br/>$13.6M combined LTV]
+      B1 --> B2[Save 50% → $0.7M/yr recurring]
+    end
+    subgraph C["Action 3 — Upsell (25%)"]
+      C1[48 premium upsell candidates<br/>17% acceptance vs 12% network]
+      C1 --> C2[5 offers × 17% conv<br/>~$1.5–3M new ancillary]
+    end
+
+    classDef impact fill:#dcfce7,stroke:#166534,color:#166534
+    class A2,B2,C2 impact
+```
 
 ## Risks & assumptions
 

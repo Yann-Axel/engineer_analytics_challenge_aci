@@ -7,6 +7,25 @@
 > - `data/enriched/` — synthetic data + scaled starter (this dictionary's scope)
 > - dbt staging normalises & renames in Part 2
 
+## Source overview (entities & foreign keys)
+
+```mermaid
+erDiagram
+    airports        ||--o{ routes             : "origin / destination"
+    routes          ||--o{ flights            : "operated as"
+    aircraft        ||--o{ flights            : "tail"
+    flights         ||--|| flight_costs       : "1:1 cost"
+    flights         ||--o{ disruptions        : "may have"
+    flights         ||--o{ bookings           : "carries"
+    flights         ||--o{ cargo_shipments    : "carries (widebody)"
+    customers       ||--o{ bookings           : "makes"
+    customers       ||--o{ loyalty_activity   : "earns / redeems"
+    customers       ||--o{ customer_feedback  : "writes (FR/EN text)"
+    bookings        ||--o{ ancillary_offers   : "presented"
+    routes          ||--o{ competitors        : "benchmark"
+    airports        ||--o{ weather_daily      : "weather"
+```
+
 ## Reference / dimensions
 
 ### `airports.parquet` (13 rows)

@@ -17,6 +17,25 @@ The brief asks for an Executive Growth Allocation Dashboard covering four areas 
 
 All 18 charts trace back to a Part-1 KPI or to an ontology concept from Part 2 — nothing was invented in the BI layer.
 
+```mermaid
+flowchart TB
+    Q{{CEO question<br/>Where to invest first?<br/>Route / Retention / Upsell?}}
+    Q --> D1[Network & Profitability<br/>5 charts]
+    Q --> D2[Customer & Retention<br/>5 charts]
+    Q --> D3[Upsell & Cross-sell<br/>4 charts]
+    D1 --> D4[Decision Layer<br/>4 ontology tables<br/>Grow / Defend / Retain / Prioritise]
+    D2 --> D4
+    D3 --> D4
+    D4 --> R[[Executive recommendation<br/>40 / 35 / 25 split]]
+
+    classDef q fill:#fef3c7,stroke:#92400e,color:#92400e
+    classDef dec fill:#dbeafe,stroke:#1e3a8a,color:#1e3a8a
+    classDef out fill:#dcfce7,stroke:#166534,color:#166534
+    class Q q
+    class D4 dec
+    class R out
+```
+
 ## 3. Reproducibility (10 minutes from a clean clone)
 
 ```bash
@@ -32,6 +51,16 @@ cd ../..
 ```
 
 Login: `admin / admin`. The four dashboards are reachable at `http://localhost:8088/superset/dashboard/<slug>/`.
+
+```mermaid
+flowchart LR
+    A[(dbt/airline.duckdb)] -->|duckdb-engine| B[Apache Superset 4.1.2<br/>Docker]
+    C[setup_datasets.py] --> B
+    D[setup_charts.py<br/>18 charts] --> B
+    E[setup_dashboards.py<br/>4 dashboards] --> B
+    F[capture_screenshots.py<br/>Playwright] --> G[docs/screenshots/*.png]
+    B --> F
+```
 
 ## 4. Captures
 

@@ -26,6 +26,14 @@ The starter had 100% active customers — unrealistic. We add 700 new customers 
 | Regular | 25% | 6–20 |
 | Power user | 5% | 21–60 |
 
+```mermaid
+pie showData title Customer activity distribution (24 months, n=1,000)
+    "Inactive (0 bookings)" : 20
+    "Occasional (1-5)" : 50
+    "Regular (6-20)" : 25
+    "Power user (21-60)" : 5
+```
+
 → ~80% active customer base, aligned with flag-carrier benchmarks. Critical for the **Repeat Booking Rate** and **Recency** KPIs.
 
 ## 4. Unstructured feedback (the brief's mandatory dataset)
@@ -40,3 +48,16 @@ The starter had 100% active customers — unrealistic. We add 700 new customers 
 - Single global `SEED = 42` in `scripts/lib/config.py`.
 - Independent NumPy RNG streams per entity (10, 11, 12, 13, 14, 15) — changing one generator doesn't perturb the others.
 - End-to-end regeneration: `python scripts/run_all.py` → ~2 minutes. Validation: `python scripts/99_validate_pipeline.py` → 24/24 checks PASS.
+
+```mermaid
+flowchart LR
+    SEED([SEED = 42<br/>scripts/lib/config.py]) --> RNG[6 independent<br/>NumPy RNG streams]
+    RNG --> GEN[run_all.py<br/>~2 min]
+    GEN --> RAW[(data/raw<br/>immutable starter)]
+    GEN --> ENR[(data/enriched<br/>synthetic + scaled)]
+    ENR --> VAL[99_validate_pipeline.py]
+    VAL --> OK{{24 / 24 checks PASS}}
+
+    classDef ok fill:#dcfce7,stroke:#166534,color:#166534
+    class OK ok
+```

@@ -20,20 +20,25 @@ modelling choice, semantic layer, ontology, and unstructured-data integration.
 
 ## 2. The model — 5 facts × 6 dimensions
 
+```mermaid
+erDiagram
+    dim_date                ||--o{ fct_flights           : "flight_date_sk"
+    dim_date                ||--o{ fct_bookings          : "booking_date_sk"
+    dim_date                ||--o{ fct_loyalty_events    : "event_date_sk"
+    dim_date                ||--o{ fct_customer_feedback : "feedback_date_sk"
+    dim_customer_current    ||--o{ fct_bookings          : "customer_sk (SCD2 snap)"
+    dim_customer_current    ||--o{ fct_loyalty_events    : "customer_sk"
+    dim_customer_current    ||--o{ fct_customer_feedback : "customer_sk"
+    dim_route               ||--o{ fct_flights           : "route_sk"
+    dim_route               ||--o{ fct_customer_feedback : "route_sk"
+    dim_aircraft            ||--o{ fct_flights           : "aircraft_sk"
+    dim_airport             ||--o{ dim_route             : "origin / destination"
+    dim_fare                ||--o{ fct_bookings          : "fare_sk"
+    fct_flights             ||--o{ fct_bookings          : "flight_sk"
+    fct_bookings            ||--o{ fct_ancillary_offers  : "booking_sk"
 ```
-                    dim_date
-                       │
-   dim_customer ───────┼──── dim_route ─── dim_aircraft / dim_airport
-   (SCD2 snap.)        │
-                       ▼
-                 fct_flights ──── fct_customer_feedback (NLP)
-                       │
-                 fct_bookings ─── dim_fare
-                       │
-              fct_ancillary_offers
-                       │
-              fct_loyalty_events
-```
+
+Lecture en étoile : les `dim_*` (gauche) gravitent autour des `fct_*` (centre/droite) ; les surrogate keys `_sk` (générées par `dbt_utils.generate_surrogate_key`) matérialisent chaque branche de l'étoile.
 
 Three brief themes → mart coverage:
 
@@ -44,6 +49,24 @@ Three brief themes → mart coverage:
 | Upsell / cross-sell | `fct_ancillary_offers`, `fct_bookings`, `dim_fare` |
 
 Materialisations: `view` for staging, `table` for marts and ontology, `ephemeral` for intermediate helpers. **160 / 160 dbt tests PASS** after `dbt build`.
+
+```mermaid
+flowchart LR
+    SRC[(data/enriched<br/>parquet sources)] --> STG[stg_*<br/>views<br/>cast + rename]
+    STG --> INT[int_*<br/>ephemeral<br/>joins + pre-agg]
+    INT --> MARTS[dim_* / fct_*<br/>tables]
+    MARTS --> ONT[ont_*<br/>ontology concepts]
+    MARTS --> SEM[Semantic layer<br/>_semantic_models.yml<br/>_metrics.yml]
+    ONT --> BI[Superset dashboards]
+    SEM --> BI
+    MARTS --> MCP[MCP server<br/>Part 4]
+    ONT --> MCP
+
+    classDef mart fill:#dbeafe,stroke:#1e3a8a,color:#1e3a8a
+    classDef ont fill:#fef3c7,stroke:#92400e,color:#92400e
+    class MARTS mart
+    class ONT ont
+```
 
 ---
 
@@ -84,15 +107,23 @@ The brief lists four examples — *sentiment scoring, complaint categories, rout
 
 **Pipeline (dbt-native, rule-based, explainable):**
 
-```
-data/enriched/customer_feedback.parquet (3,000 raw FR/EN texts)
-       │
-stg_customer_feedback           (normalise text)
-       │
-int_feedback_sentiment          (lexicon-based score in [-1, +1]
-                                 + negation handling 2-token window)
-       │
-fct_customer_feedback           (joinable to dim_customer, dim_route)
+```mermaid
+flowchart TB
+    A[(customer_feedback.parquet<br/>3,000 raw FR/EN texts)]
+    A --> B[stg_customer_feedback<br/>normalise text]
+    B --> C[int_feedback_tokens<br/>tokenise]
+    C --> D[int_feedback_sentiment<br/>lexicon-based score -1..+1<br/>+ negation 2-token window]
+    C --> E[int_feedback_category<br/>complaint taxonomy]
+    C --> F[int_feedback_tags<br/>semantic tags]
+    D --> G[fct_customer_feedback<br/>joinable to dim_customer, dim_route]
+    E --> G
+    F --> G
+    G --> H[int_route_complaint_themes<br/>route-level rollup]
+
+    classDef src fill:#f3f4f6,stroke:#374151
+    classDef out fill:#dcfce7,stroke:#166534,color:#166534
+    class A src
+    class G,H out
 ```
 
 **Worked example** — what the input looks like and what the model derives:

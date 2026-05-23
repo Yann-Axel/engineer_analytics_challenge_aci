@@ -6,11 +6,31 @@ brief architecture explanation.
 
 ## Architecture (briefly)
 
-```
-Claude Desktop  ──stdio──▶  mcp_server  ──read-only──▶  dbt/airline.duckdb
-                            (FastMCP)                    ├ marts (structured)
-                                                         ├ ontology
-                                                         └ feedback (unstructured)
+```mermaid
+flowchart LR
+    CD[Claude Desktop<br/>AI assistant]
+    CD -->|stdio / MCP| SRV[mcp_server<br/>FastMCP, Python]
+
+    SRV --> T1[[list_routes_with_kpis]]
+    SRV --> T2[[list_high_value_at_risk_customers]]
+    SRV --> T3[[search_feedback_text]]
+
+    T1 -->|read-only<br/>parametrised SQL| DB[(dbt/airline.duckdb)]
+    T2 -->|read-only| DB
+    T3 -->|read-only| DB
+
+    DB --> M[marts dim_* / fct_*<br/>structured]
+    DB --> O[ontology ont_*<br/>structured rules]
+    DB --> F[fct_customer_feedback<br/>unstructured FR/EN text]
+
+    T1 -.uses.-> M
+    T2 -.uses.-> O
+    T3 -.uses.-> F
+
+    classDef tool fill:#dbeafe,stroke:#1e3a8a,color:#1e3a8a
+    classDef unstr fill:#fef3c7,stroke:#92400e,color:#92400e
+    class T1,T2,T3 tool
+    class F unstr
 ```
 
 Three tools cover the brief's three grounded questions:
