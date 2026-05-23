@@ -11,3 +11,6 @@ duckdb>=1.0
 
 # Dashboard tooling (Part 3) — API client to provision Superset datasets
 requests>=2.31
+
+# Headless browser for dashboard screenshot capture (Part 3)
+playwright>=1.40

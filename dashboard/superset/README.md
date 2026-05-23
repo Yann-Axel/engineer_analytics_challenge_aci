@@ -46,7 +46,13 @@ Re-running the script is safe: it detects existing resources via the API's
 ## Provision charts and dashboards
 
 ```bash
+# 1. Set datetime columns on time-series datasets (one-shot)
+.venv/Scripts/python dashboard/superset/configure_datetime_columns.py
+
+# 2. Create the 34 charts
 .venv/Scripts/python dashboard/superset/setup_charts.py
+
+# 3. Create the 5 dashboards (attaches charts + applies layout)
 .venv/Scripts/python dashboard/superset/setup_dashboards.py
 ```
 
@@ -63,6 +69,24 @@ Creates 34 charts grouped into 5 dashboards (idempotent on re-run):
 All dashboards carry a shared **Date Range** native filter at the top.
 
 Open each one at `http://localhost:8088/superset/dashboard/<slug>/`.
+
+## Capture screenshots (Playwright headless)
+
+```bash
+.venv/Scripts/python dashboard/superset/capture_screenshots.py
+```
+
+Produces five PNG files under `docs/screenshots/`:
+
+| File | Dashboard |
+|---|---|
+| `00_executive_overview.png` | Page 0 |
+| `01_network_profitability.png` | Page 1 |
+| `02_customer_retention.png` | Page 2 |
+| `03_upsell_crosssell.png` | Page 3 |
+| `04_decision_layer.png` | Page 4 |
+
+Requires `playwright install chromium` once (already in `requirements.txt`).
 
 ## Sanity check query
 

@@ -79,10 +79,12 @@ def metric_avg(column: str, label: str | None = None) -> dict[str, Any]:
 
 
 def metric_count(label: str = "COUNT(*)") -> dict[str, Any]:
+    # Use SQL expression instead of SIMPLE with empty column_name —
+    # the empty-column form triggers a DuckDB+Superset 4.1.2 bug
+    # ("string index out of range") on certain groupbys.
     return {
-        "expressionType": "SIMPLE",
-        "column": {"column_name": ""},
-        "aggregate": "COUNT",
+        "expressionType": "SQL",
+        "sqlExpression": "COUNT(*)",
         "label": label,
     }
 
@@ -268,11 +270,11 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Overview · Revenue Trend (monthly)",
         dataset="int_route_monthly_perf",
-        viz_type="line",
+        viz_type="echarts_timeseries_line",
         page_tag=PAGE,
         description="Total revenue per month across all routes.",
         params={
-            "viz_type": "line",
+            "viz_type": "echarts_timeseries_line",
             "x_axis": "period_month",
             "metrics": [metric_sum("revenue_usd", "Revenue")],
             "groupby": [],
@@ -352,11 +354,11 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Net · OTP15 Trend (monthly)",
         dataset="int_route_monthly_perf",
-        viz_type="line",
+        viz_type="echarts_timeseries_line",
         page_tag=PAGE,
         description="Monthly on-time performance (≤15 min) across operated flights.",
         params={
-            "viz_type": "line",
+            "viz_type": "echarts_timeseries_line",
             "x_axis": "period_month",
             "metrics": [metric_avg("otp15_rate", "OTP15")],
             "groupby": [],
@@ -371,11 +373,11 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Net · Cancellation Rate Trend",
         dataset="int_route_monthly_perf",
-        viz_type="line",
+        viz_type="echarts_timeseries_line",
         page_tag=PAGE,
         description="Monthly cancellation rate, all routes combined.",
         params={
-            "viz_type": "line",
+            "viz_type": "echarts_timeseries_line",
             "x_axis": "period_month",
             "metrics": [metric_avg("cancellation_rate", "Cancel Rate")],
             "groupby": [],
@@ -426,62 +428,65 @@ def build_charts() -> list[ChartSpec]:
         },
     ))
 
-    # 1.7 Disruption breakdown table
+    # 1.7 Disruption breakdown — switched to a dedicated source (disruptions
+    # table via fct_flights filtered to has_disruption=true) to avoid the
+    # NULL-filter bug in Superset 4.1.2 + DuckDB combination.
     charts.append(ChartSpec(
         name="Net · Disruptions by Type",
         dataset="fct_flights",
-        viz_type="table",
+        viz_type="dist_bar",
         page_tag=PAGE,
-        description="Count of disruptions per type, sortable.",
+        description="Count of disruption events per type (excludes non-disrupted flights).",
         params={
-            "viz_type": "table",
-            "query_mode": "aggregate",
+            "viz_type": "dist_bar",
+            "metrics": [metric_sql(
+                "SUM(CASE WHEN disruption_type IS NOT NULL THEN 1 ELSE 0 END)",
+                "Disruption Count",
+            )],
             "groupby": ["disruption_type"],
-            "metrics": [metric_count("Disruption Count")],
-            "row_limit": 25,
+            "row_limit": 15,
             "order_desc": True,
-            "adhoc_filters": [{
-                "expressionType": "SIMPLE",
-                "subject": "disruption_type",
-                "operator": "IS NOT NULL",
-            }],
+            "color_scheme": "supersetColors",
         },
     ))
 
     # ═══ PAGE 2 — CUSTOMER & RETENTION (7 charts) ═══════════════════════════
     PAGE = "customer_retention"
 
-    # 2.1 Customer segmentation (pie)
+    # 2.1 Customer segmentation (bar — pie viz triggered a Superset 4.1/DuckDB
+    # "string index out of range" bug on simple count groupbys).
     charts.append(ChartSpec(
         name="Cust · Segment Distribution",
         dataset="dim_customer_current",
-        viz_type="pie",
+        viz_type="dist_bar",
         page_tag=PAGE,
         description="Customer base by segment.",
         params={
-            "viz_type": "pie",
-            "metric": metric_count("Customers"),
+            "viz_type": "dist_bar",
+            "metrics": [metric_count("Customers")],
             "groupby": ["customer_segment"],
             "row_limit": 10,
+            "order_desc": True,
             "color_scheme": "supersetColors",
-            "show_legend": True,
+            "show_legend": False,
         },
     ))
 
-    # 2.2 Loyalty tier distribution (pie)
+    # 2.2 Loyalty tier distribution (bar)
     charts.append(ChartSpec(
         name="Cust · Loyalty Tier Distribution",
         dataset="dim_customer_current",
-        viz_type="pie",
+        viz_type="dist_bar",
         page_tag=PAGE,
         description="Customer base by loyalty tier (incl. non-member).",
         params={
-            "viz_type": "pie",
-            "metric": metric_count("Customers"),
+            "viz_type": "dist_bar",
+            "metrics": [metric_count("Customers")],
             "groupby": ["loyalty_tier_safe"],
             "row_limit": 10,
+            "order_desc": True,
             "color_scheme": "supersetColors",
-            "show_legend": True,
+            "show_legend": False,
         },
     ))
 
@@ -527,11 +532,11 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Cust · Sentiment Trend (monthly)",
         dataset="fct_customer_feedback",
-        viz_type="line",
+        viz_type="echarts_timeseries_line",
         page_tag=PAGE,
         description="Average sentiment score per month.",
         params={
-            "viz_type": "line",
+            "viz_type": "echarts_timeseries_line",
             "x_axis": "feedback_date",
             "metrics": [metric_avg("sentiment_score", "Avg Sentiment")],
             "groupby": [],
@@ -646,11 +651,11 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Up · Ancillary Revenue Trend",
         dataset="fct_bookings",
-        viz_type="line",
+        viz_type="echarts_timeseries_line",
         page_tag=PAGE,
         description="Total ancillary revenue per month.",
         params={
-            "viz_type": "line",
+            "viz_type": "echarts_timeseries_line",
             "x_axis": "booking_date",
             "metrics": [metric_sum("ancillary_revenue_usd", "Ancillary Revenue")],
             "groupby": [],
@@ -686,11 +691,11 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Up · Loyalty Points Earned (monthly)",
         dataset="fct_loyalty_events",
-        viz_type="line",
+        viz_type="echarts_timeseries_line",
         page_tag=PAGE,
         description="Total loyalty points earned per month (excludes redemptions).",
         params={
-            "viz_type": "line",
+            "viz_type": "echarts_timeseries_line",
             "x_axis": "event_date",
             "metrics": [metric_sum("points_earned", "Points Earned")],
             "groupby": [],

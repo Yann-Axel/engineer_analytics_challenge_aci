@@ -193,8 +193,9 @@ def build_position_json(rows_layout: list[tuple[str, list[str]]],
 
 def build_native_filter() -> dict:
     """One shared time-range filter applied to all dashboards.
-    The default is 'No filter' so the dashboard shows the full 24 months
-    on first load; the user picks a range if needed.
+    The full schema (scope.excluded, controlValues, defaultDataMask…) is
+    required by Superset 4.1.2's front-end — any missing key crashes the
+    React tree with "Cannot read properties of undefined (reading 'excluded')".
     """
     return {
         "native_filter_configuration": [
@@ -202,11 +203,25 @@ def build_native_filter() -> dict:
                 "id": "NATIVE_FILTER-time-range",
                 "name": "Date Range",
                 "filterType": "filter_time",
-                "targets": [{}],  # applies globally
-                "defaultDataMask": {"filterState": {"value": "No filter"}},
-                "controlValues": {},
+                "targets": [{}],
+                "controlValues": {
+                    "enableEmptyFilter": False,
+                    "defaultToFirstItem": False,
+                    "multiple": True,
+                    "searchAllOptions": False,
+                    "inverseSelection": False,
+                },
+                "defaultDataMask": {
+                    "filterState": {"value": "No filter"},
+                    "extraFormData": {},
+                },
+                "scope": {
+                    "rootPath": ["ROOT_ID"],
+                    "excluded": [],
+                },
                 "type": "NATIVE_FILTER",
                 "description": "Limit all charts to a date range.",
+                "chartsInScope": [],
             }
         ],
         "global_chart_configuration": {},
@@ -328,6 +343,36 @@ class SupersetClient:
             return False
         return True
 
+    def attach_chart_to_dashboard(self, chart_id: int, dashboard_id: int) -> bool:
+        """Associate a chart with a dashboard (many-to-many).
+        position_json alone is not enough — Superset also tracks the
+        relation via the dashboard_slices table, populated when we PUT
+        the chart's `dashboards` field. Idempotent: setting the same
+        dashboard list twice is a no-op."""
+        # Read current dashboards of the chart
+        r = self.session.get(
+            f"{self.base_url}/api/v1/chart/{chart_id}",
+            headers={"Authorization": f"Bearer {self.access_token}"},
+            timeout=30,
+        )
+        current_ids: list[int] = []
+        if r.status_code == 200:
+            current_ids = [d["id"] for d in r.json()["result"].get("dashboards", [])]
+        if dashboard_id in current_ids:
+            return True
+        new_ids = sorted(set(current_ids + [dashboard_id]))
+        r = self.session.put(
+            f"{self.base_url}/api/v1/chart/{chart_id}",
+            headers=self._hdr(),
+            json={"dashboards": new_ids},
+            timeout=60,
+        )
+        if r.status_code >= 400:
+            print(f"      ! attach_chart_to_dashboard {chart_id}→{dashboard_id} failed: "
+                  f"{r.status_code} {r.text[:150]}")
+            return False
+        return True
+
 
 def get_dashboard_id_by_slug(slug: str) -> int | None:
     try:
@@ -374,12 +419,18 @@ def main() -> int:
             print(f"  + {spec.title:<35s} created (id={dash_id})")
             created += 1
 
-        # Build layout and attach charts
+        # 1) Attach each chart to the dashboard (many-to-many relation).
+        attached = 0
+        chart_ids = [name_to_id[name] for _, names in spec.rows_layout
+                     for name in names if name in name_to_id]
+        for chart_id in chart_ids:
+            if client.attach_chart_to_dashboard(chart_id, dash_id):
+                attached += 1
+        # 2) Build layout (position_json) and apply.
         position_json = build_position_json(spec.rows_layout, name_to_id)
         json_metadata = build_native_filter()
         if client.update_dashboard(dash_id, position_json, json_metadata):
-            chart_count = sum(1 for k in position_json if k.startswith("CHART-"))
-            print(f"      ↳ {chart_count} charts attached + global time-range filter")
+            print(f"      ↳ {attached} charts attached + grid layout + global time-range filter")
             updated += 1
         else:
             failed += 1
