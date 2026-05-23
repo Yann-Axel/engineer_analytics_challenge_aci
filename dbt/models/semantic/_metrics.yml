@@ -1,0 +1,250 @@
+version: 2
+
+# Metrics layer — the 24 KPIs from Part 1, declared as dbt metrics.
+# Design:
+#   - "m_*" simple metrics expose atomic measures (one-to-one with measures).
+#   - Business KPIs are derived metrics combining those m_* via expressions.
+# Single source of truth, consumed by Dashboard (Part 3) and MCP/AI (Part 4).
+
+metrics:
+
+  # ─── ATOMIC MEASURES exposed as simple metrics ──────────────────────────
+
+  - name: m_total_revenue
+    label: "Total Revenue (USD)"
+    description: "Atomic measure: ticket + ancillary revenue from flights."
+    type: simple
+    type_params: { measure: total_revenue }
+
+  - name: m_total_operating_cost
+    label: "Operating Cost (USD)"
+    description: "Atomic measure: total direct operating cost per flight."
+    type: simple
+    type_params: { measure: total_operating_cost }
+
+  - name: m_total_margin
+    label: "Flight Margin (USD)"
+    type: simple
+    type_params: { measure: total_margin }
+
+  - name: m_pax_count
+    label: "Passenger Count"
+    type: simple
+    type_params: { measure: pax_count }
+
+  - name: m_seat_capacity
+    label: "Seat Capacity"
+    type: simple
+    type_params: { measure: seat_capacity_sum }
+
+  - name: m_distance_km_total
+    label: "Distance Total (km)"
+    type: simple
+    type_params: { measure: distance_km_total }
+
+  - name: m_flights_scheduled
+    label: "Flights Scheduled"
+    type: simple
+    type_params: { measure: flights_scheduled }
+
+  - name: m_flights_operated
+    label: "Flights Operated"
+    type: simple
+    type_params: { measure: flights_operated }
+
+  - name: m_flights_cancelled
+    label: "Flights Cancelled"
+    type: simple
+    type_params: { measure: flights_cancelled }
+
+  - name: m_flights_on_time
+    label: "Flights On Time"
+    type: simple
+    type_params: { measure: flights_on_time }
+
+  - name: m_bookings_count
+    label: "Bookings Count"
+    type: simple
+    type_params: { measure: bookings_count }
+
+  - name: m_unique_customers
+    label: "Unique Customers"
+    type: simple
+    type_params: { measure: unique_customers }
+
+  - name: m_bookings_with_ancillary
+    label: "Bookings With Ancillary"
+    type: simple
+    type_params: { measure: bookings_with_ancillary }
+
+  - name: m_ticket_revenue
+    label: "Ticket Revenue (USD)"
+    type: simple
+    type_params: { measure: ticket_revenue }
+
+  - name: m_ancillary_revenue
+    label: "Ancillary Revenue (USD)"
+    type: simple
+    type_params: { measure: ancillary_revenue }
+
+  - name: m_feedback_count
+    label: "Feedback Count"
+    type: simple
+    type_params: { measure: feedbacks_count }
+
+  - name: m_negative_feedback_count
+    label: "Negative Feedback Count"
+    type: simple
+    type_params: { measure: negative_feedback_count }
+
+  - name: m_avg_sentiment_score
+    label: "Average Sentiment Score"
+    type: simple
+    type_params: { measure: avg_sentiment_score }
+
+  - name: m_offers_presented
+    label: "Ancillary Offers Presented"
+    type: simple
+    type_params: { measure: offers_presented }
+
+  - name: m_offers_accepted
+    label: "Ancillary Offers Accepted"
+    type: simple
+    type_params: { measure: offers_accepted }
+
+  - name: m_points_earned
+    label: "Loyalty Points Earned"
+    type: simple
+    type_params: { measure: points_earned_total }
+
+  # ─── BUSINESS KPIs — THEME 1: Route Optimization & Growth ──────────────
+
+  - name: route_revenue
+    label: "Route Revenue"
+    description: "Sum of ticket + ancillary revenue, attributable to a route × period."
+    type: simple
+    type_params: { measure: total_revenue }
+    filter: "{{ Dimension('flight__flight_status') }} <> 'Cancelled'"
+
+  - name: route_margin_pct
+    label: "Route Margin %"
+    description: "(Revenue - Direct Operating Cost) / Revenue at route × period."
+    type: ratio
+    type_params:
+      numerator:   m_total_margin
+      denominator: m_total_revenue
+
+  - name: load_factor
+    label: "Load Factor"
+    description: "Passengers carried / seat capacity available."
+    type: ratio
+    type_params:
+      numerator:   m_pax_count
+      denominator: m_seat_capacity
+
+  - name: otp15_rate
+    label: "On-Time Performance (≤15 min)"
+    description: "Share of operated flights with departure delay ≤ 15 minutes."
+    type: ratio
+    type_params:
+      numerator:   m_flights_on_time
+      denominator: m_flights_operated
+
+  - name: cancellation_rate
+    label: "Cancellation Rate"
+    description: "Cancelled flights divided by total scheduled flights."
+    type: ratio
+    type_params:
+      numerator:   m_flights_cancelled
+      denominator: m_flights_scheduled
+
+  - name: yield_rask
+    label: "Yield (RASK)"
+    description: "Revenue per available seat-km. Computed as total_revenue / (seat_capacity × avg_distance_km)."
+    type: derived
+    type_params:
+      expr: "m_total_revenue / nullif(m_seat_capacity * (m_distance_km_total / nullif(m_flights_scheduled,0)),0)"
+      metrics:
+        - name: m_total_revenue
+        - name: m_seat_capacity
+        - name: m_distance_km_total
+        - name: m_flights_scheduled
+
+  # ─── BUSINESS KPIs — THEME 2: Customer Retention ────────────────────────
+
+  - name: repeat_booking_rate
+    label: "Repeat Booking Rate"
+    description: "(Total bookings - unique customers) / total bookings — proxy of repeat behaviour."
+    type: derived
+    type_params:
+      expr: "(m_bookings_count - m_unique_customers) / nullif(m_bookings_count, 0)"
+      metrics:
+        - name: m_bookings_count
+        - name: m_unique_customers
+
+  - name: avg_sentiment
+    label: "Average Customer Sentiment"
+    description: "Mean sentiment score from NLP-derived feedback."
+    type: simple
+    type_params: { measure: avg_sentiment_score }
+
+  - name: negative_feedback_share
+    label: "Negative Feedback Share"
+    description: "Share of feedback labelled negative."
+    type: ratio
+    type_params:
+      numerator:   m_negative_feedback_count
+      denominator: m_feedback_count
+
+  - name: feedback_volume
+    label: "Feedback Volume"
+    description: "Count of received feedback in the period."
+    type: simple
+    type_params: { measure: feedbacks_count }
+
+  # ─── BUSINESS KPIs — THEME 3: Upsell / Cross-sell ───────────────────────
+
+  - name: ancillary_attach_rate
+    label: "Ancillary Attach Rate"
+    description: "Share of bookings with at least one ancillary."
+    type: ratio
+    type_params:
+      numerator:   m_bookings_with_ancillary
+      denominator: m_bookings_count
+
+  - name: arpp
+    label: "Ancillary Revenue per Passenger"
+    description: "Total ancillary revenue divided by passenger count."
+    type: derived
+    type_params:
+      expr: "m_ancillary_revenue / nullif(m_pax_count, 0)"
+      metrics:
+        - name: m_ancillary_revenue
+        - name: m_pax_count
+
+  - name: offer_acceptance_rate
+    label: "Offer Acceptance Rate"
+    description: "Accepted ancillary offers over presented offers."
+    type: ratio
+    type_params:
+      numerator:   m_offers_accepted
+      denominator: m_offers_presented
+
+  - name: upgrade_conversion_rate
+    label: "Upgrade Conversion Rate"
+    description: "Accepted upgrade offers over presented upgrade offers."
+    type: ratio
+    type_params:
+      numerator:   m_offers_accepted
+      denominator: m_offers_presented
+    filter: "{{ Dimension('ancillary_offer__offer_type') }} in ('upgrade_W','upgrade_J')"
+
+  - name: avg_ticket_price
+    label: "Average Ticket Price"
+    description: "Mean ticket price for bookings in the period."
+    type: derived
+    type_params:
+      expr: "m_ticket_revenue / nullif(m_bookings_count, 0)"
+      metrics:
+        - name: m_ticket_revenue
+        - name: m_bookings_count

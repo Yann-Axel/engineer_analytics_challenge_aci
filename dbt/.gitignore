@@ -1,0 +1,9 @@
+target/
+dbt_packages/
+logs/
+*.duckdb
+*.duckdb.wal
+*.duckdb.tmp
+.user.yml
+# Note: dbt/profiles.yml IS committed here because it has no secrets (local
+# DuckDB path only). In a real cloud setup you'd .gitignore it.

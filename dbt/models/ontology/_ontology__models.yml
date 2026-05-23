@@ -1,0 +1,66 @@
+version: 2
+
+models:
+  - name: ont_high_value_at_risk_customer
+    description: |
+      Customers with substantial lifetime spend AND above-median recency AND
+      a dissatisfaction signal (complaint, negative sentiment, or churn risk).
+      Owner: Chief Customer Officer | Refresh: weekly.
+    columns:
+      - name: customer_id
+        data_tests: [not_null, unique]
+      - name: ontology_concept
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['HighValueAtRiskCustomer'] }
+
+  - name: ont_strategic_underperforming_route
+    description: |
+      Strategic routes whose 12-month margin sits in the bottom half of all
+      strategic peers AND whose load factor remains ≥ 0.65.
+      Owner: VP Network | Refresh: monthly.
+    columns:
+      - name: route_id
+        data_tests: [not_null, unique]
+      - name: ontology_concept
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['StrategicUnderperformingRoute'] }
+
+  - name: ont_premium_upsell_candidate
+    description: |
+      Standard/Business segment customers in Silver/Gold tier with upgrade
+      acceptance rate in the top quartile of presented upgrade offers.
+      Owner: Ancillary Manager | Refresh: monthly.
+    columns:
+      - name: customer_id
+        data_tests: [not_null, unique]
+      - name: ontology_concept
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['PremiumUpsellCandidate'] }
+
+  - name: ont_loyal_detractor
+    description: |
+      Gold-tier frequent flyers (≥4 segments in 12m) with 6-month average
+      sentiment below -0.3.
+      Owner: Loyalty Manager | Refresh: weekly.
+    columns:
+      - name: customer_id
+        data_tests: [not_null, unique]
+      - name: ontology_concept
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['LoyalDetractor'] }
+
+  - name: ont_irops_heavy_route
+    description: |
+      Routes in the top decile of disruption rate AND cancellation rate > 5%.
+      Owner: COO | Refresh: weekly.
+    columns:
+      - name: route_id
+        data_tests: [not_null, unique]
+      - name: ontology_concept
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['IROPSHeavyRoute'] }

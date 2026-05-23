@@ -1,0 +1,179 @@
+version: 2
+
+models:
+
+  # ─── Dimensions ─────────────────────────────────────────────────────────
+
+  - name: dim_date
+    description: "Rich daily date dimension (2023-2026)."
+    columns:
+      - name: date_sk
+        description: "Surrogate key: yyyymmdd as integer."
+        data_tests: [not_null, unique]
+      - name: date_day
+        data_tests: [not_null, unique]
+      - name: season_aviation
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['peak', 'shoulder', 'off_peak'] }
+
+  - name: dim_airport
+    description: "Airport reference."
+    columns:
+      - name: airport_sk
+        data_tests: [not_null, unique]
+      - name: airport_code
+        data_tests: [not_null, unique]
+      - name: country_group
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['West Africa', 'North Africa', 'Middle East', 'Europe', 'Other']
+
+  - name: dim_route
+    description: "Route reference enriched with distance_band and strategic flag."
+    columns:
+      - name: route_sk
+        data_tests: [not_null, unique]
+      - name: route_id
+        data_tests: [not_null, unique]
+      - name: route_type
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['Domestic', 'Regional', 'International'] }
+      - name: distance_band
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['short_haul', 'medium_haul', 'long_haul'] }
+
+  - name: dim_aircraft
+    description: "Fleet reference."
+    columns:
+      - name: aircraft_sk
+        data_tests: [not_null, unique]
+      - name: tail_number
+        data_tests: [not_null, unique]
+
+  - name: dim_fare
+    description: "Fare class × fare family cross-dim."
+    columns:
+      - name: fare_sk
+        data_tests: [not_null, unique]
+      - name: fare_class
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['Economy', 'Premium Economy', 'Business'] }
+      - name: fare_family
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['Basic', 'Standard', 'Flex'] }
+
+  - name: dim_customer_current
+    description: "Current-state customer dimension (point-in-time view of the SCD2 snapshot)."
+    columns:
+      - name: customer_sk
+        data_tests: [not_null, unique]
+      - name: customer_id
+        data_tests: [not_null, unique]
+
+  # ─── Facts ──────────────────────────────────────────────────────────────
+
+  - name: fct_flights
+    description: "One row per flight, enriched with cost, revenue, disruption."
+    columns:
+      - name: flight_sk
+        data_tests: [not_null, unique]
+      - name: flight_id
+        data_tests: [not_null, unique]
+      - name: route_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_route')
+                field: route_sk
+      - name: aircraft_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_aircraft')
+                field: aircraft_sk
+      - name: flight_date_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_sk
+      - name: load_factor
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments: { min_value: 0, max_value: 1.05 }
+      - name: flight_status
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['On Time', 'Delayed', 'Cancelled'] }
+
+  - name: fct_bookings
+    description: "One row per booking, joined to the SCD2-versioned customer."
+    columns:
+      - name: booking_sk
+        data_tests: [not_null, unique]
+      - name: booking_id
+        data_tests: [not_null, unique]
+      - name: flight_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('fct_flights')
+                field: flight_sk
+      - name: route_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_route')
+                field: route_sk
+      - name: fare_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fare')
+                field: fare_sk
+      - name: booking_status
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['Flown', 'Confirmed', 'No Show', 'Changed'] }
+
+  - name: fct_customer_feedback
+    description: "One row per feedback with NLP-derived sentiment, category, tags."
+    columns:
+      - name: feedback_sk
+        data_tests: [not_null, unique]
+      - name: feedback_id
+        data_tests: [not_null, unique]
+      - name: sentiment_score
+        data_tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments: { min_value: -1, max_value: 1 }
+      - name: sentiment_label
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['negative', 'neutral', 'positive'] }
+
+  - name: fct_ancillary_offers
+    description: "One row per ancillary offer presented."
+    columns:
+      - name: ancillary_offer_sk
+        data_tests: [not_null, unique]
+      - name: ancillary_offer_id
+        data_tests: [not_null, unique]
+
+  - name: fct_loyalty_events
+    description: "One row per loyalty earn/redeem event."
+    columns:
+      - name: loyalty_event_sk
+        data_tests: [not_null, unique]
+      - name: loyalty_event_id
+        data_tests: [not_null, unique]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments: { values: ['earn', 'redeem'] }

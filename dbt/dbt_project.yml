@@ -1,0 +1,51 @@
+name: 'air_cote_divoire'
+version: '1.0.0'
+config-version: 2
+
+profile: 'air_cote_divoire'
+
+model-paths:    ["models"]
+seed-paths:     ["seeds"]
+test-paths:     ["tests"]
+macro-paths:    ["macros"]
+snapshot-paths: ["snapshots"]
+analysis-paths: ["analyses"]
+
+target-path:  "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Default materializations per layer.
+models:
+  air_cote_divoire:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: ephemeral
+      +schema: intermediate
+      nlp:
+        +materialized: table  # NLP outputs are reused across marts
+    marts:
+      +materialized: table
+      +schema: marts
+      dim:
+        +materialized: table
+      fct:
+        +materialized: table
+    ontology:
+      +materialized: table
+      +schema: ontology
+
+# Seeds (NLP lexicons): always strings, never inferred numerics
+seeds:
+  air_cote_divoire:
+    +schema: seeds
+    +quote_columns: true
+
+# Snapshots run separately from `dbt run`
+snapshots:
+  air_cote_divoire:
+    +target_schema: snapshots
+    +strategy: check
