@@ -40,15 +40,18 @@ DBT_PROFILES_DIR=. ../.venv/Scripts/dbt docs serve    # open the lineage site
 
 ## Part 1 — Business understanding & synthetic data ✅
 
-| Artefact | Path |
+The brief asks for four things; here is how each is met:
+
+| Brief requirement | Deliverable |
 |---|---|
-| Business framing & 24 KPIs | `docs/01_business_framing.md` |
-| Data dictionary | `docs/02_data_dictionary.md` |
-| Assumptions & design | `docs/03_assumptions.md` |
-| Raw layer (immutable) | `data/raw/*.parquet` |
-| Enriched layer (14 entities) | `data/enriched/*.parquet` |
-| Generation pipeline | `scripts/00_*` … `scripts/15_*` |
-| Validation (24 checks PASS) | `scripts/99_validate_pipeline.py` |
+| Describe the 5 airline business domains | [docs/01_business_framing.md §1](docs/01_business_framing.md) |
+| List KPIs guiding decisions | [docs/01_business_framing.md §2](docs/01_business_framing.md) — 10 KPIs covering the 9 brief examples |
+| Generate realistic data with ≥1 unstructured source | `data/enriched/*.parquet`, incl. `customer_feedback.parquet` (3,000 FR/EN free-text rows) |
+| Document assumptions | [docs/03_assumptions.md](docs/03_assumptions.md) — 5 load-bearing assumptions |
+
+Regenerate in one command: `python scripts/run_all.py` (~2 min, seed=42, fully reproducible).
+
+> The unstructured dataset stores **raw text only**. Sentiment, complaint category and tags are deliberately derived downstream by the Part-2 dbt NLP pipeline — that's what makes this a genuine unstructured-to-structured exercise.
 
 ## Part 2 — Modeling, semantic layer, ontology ✅
 

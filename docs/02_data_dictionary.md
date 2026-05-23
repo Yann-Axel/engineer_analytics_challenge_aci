@@ -1,9 +1,11 @@
-# Data dictionary — enriched layer (`data/enriched/`)
+# Data dictionary — supporting reference for Part 2 modelling
 
-> **Layering convention**
+> **Scope**: column-level reference for every source the dbt project (Part 2) reads. Produced as an aid to the modelling work; **not a Part-1 deliverable per se** — the Part-1 brief only asks for assumptions documentation (covered in `docs/03_assumptions.md`).
+>
+> **Layering convention**:
 > - `data/raw/` — immutable 1:1 copy of the starter Excel (5 entities)
-> - `data/enriched/` — synthetic data + scaled starter (this dictionary)
-> - dbt staging will normalise & rename in Part 2
+> - `data/enriched/` — synthetic data + scaled starter (this dictionary's scope)
+> - dbt staging normalises & renames in Part 2
 
 ## Reference / dimensions
 
