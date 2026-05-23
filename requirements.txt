@@ -14,3 +14,6 @@ requests>=2.31
 
 # Headless browser for dashboard screenshot capture (Part 3)
 playwright>=1.40
+
+# MCP server SDK (Part 4) — exposes marts + ontology to AI assistants
+mcp[cli]>=1.27
