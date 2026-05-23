@@ -1,0 +1,12 @@
+{
+  "_comment": "Paste the 'air-cote-divoire' block below into your Claude Desktop config file at %APPDATA%/Claude/claude_desktop_config.json (Windows) or ~/Library/Application Support/Claude/claude_desktop_config.json (macOS). Then restart Claude Desktop.",
+  "_path_to_replace": "Replace <PROJECT_ROOT> with the absolute path to this repository on your machine.",
+  "mcpServers": {
+    "air-cote-divoire": {
+      "command": "<PROJECT_ROOT>/.venv/Scripts/python.exe",
+      "args": ["-m", "mcp_server"],
+      "cwd": "<PROJECT_ROOT>",
+      "env": {}
+    }
+  }
+}
