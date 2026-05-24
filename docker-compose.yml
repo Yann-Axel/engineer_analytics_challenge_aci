@@ -14,7 +14,7 @@
 #              it into Claude Desktop via `docker run -i ...` (see README).
 #
 # Quick start:
-#     docker compose up --build pipeline superset
+#     docker compose up --build -d pipeline superset superset-provisioner
 # =============================================================================
 
 services:
@@ -32,9 +32,10 @@ services:
       # developer all see the same files.
       - ./data:/app/data
       - ./dbt:/app/dbt
-      # Optional: mount the starter Excel if you have it locally. The
-      # entrypoint detects its absence and falls back to data/raw/.
-      - ./air_cote_divoire_starter_dataset.xlsx:/app/air_cote_divoire_starter_dataset.xlsx:ro
+      # If you have the starter Excel locally and want to re-run step 00,
+      # add this mount via a docker-compose.override.yml (do NOT add it
+      # here — Docker would create a phantom file/dir on a fresh clone):
+      #   - ./air_cote_divoire_starter_dataset.xlsx:/app/air_cote_divoire_starter_dataset.xlsx:ro
     command: ["/app/docker/entrypoint-pipeline.sh"]
     restart: "no"
 
@@ -70,6 +71,26 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+
+  # ── Part 3 ─ Superset provisioner (one-shot) ───────────────────────────────
+  # Runs after Superset is healthy: registers the DuckDB connection, creates
+  # 19 datasets, sets time-grain columns, then creates 34 charts and 5
+  # dashboards. Idempotent — re-runs skip what already exists.
+  superset-provisioner:
+    image: airline-pipeline:latest
+    container_name: airline-superset-provisioner
+    depends_on:
+      superset:
+        condition: service_healthy
+    environment:
+      SUPERSET_URL: http://superset:8088
+      SUPERSET_DB_PATH: /app/superset_home/superset.db
+    volumes:
+      # Shared with the `superset` service so configure_datetime_columns.py
+      # can write `main_dttm_col` directly to the SQLite metastore.
+      - superset_home:/app/superset_home
+    command: ["/app/docker/entrypoint-provisioner.sh"]
+    restart: "no"
 
   # ── Part 4 ─ MCP server (stdio; ad-hoc) ────────────────────────────────────
   # Not part of the default `up` because MCP is a stdio process driven by an

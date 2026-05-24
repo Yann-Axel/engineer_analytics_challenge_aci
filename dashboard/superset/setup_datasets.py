@@ -15,12 +15,13 @@ Usage (assuming Superset is up via `docker compose up -d`):
 """
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import dataclass
 
 import requests
 
-SUPERSET_URL = "http://localhost:8088"
+SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088")
 ADMIN_USER = "admin"
 ADMIN_PASS = "admin"
 DB_DISPLAY_NAME = "airline-duckdb"

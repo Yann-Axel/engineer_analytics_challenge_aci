@@ -26,18 +26,17 @@ whole stack: a one-shot **pipeline** service (Part 1+2) followed by **Superset**
 (Part 3), with the **MCP server** (Part 4) available on demand.
 
 ```bash
-# 1. Build images + run pipeline + bring up Superset
-docker compose up --build pipeline superset
+# 1. Build images + run pipeline + bring up Superset + auto-provision
+#    - `pipeline` builds the DuckDB warehouse via dbt
+#    - `superset` boots Superset, auto-initialising its metastore + admin user
+#    - `superset-provisioner` waits for Superset to be healthy, then creates
+#      the DuckDB connection, 19 datasets, charts and dashboards (idempotent)
+docker compose up --build -d pipeline superset superset-provisioner
 
-# 2. (First Superset run only) bootstrap admin + roles
-bash dashboard/superset/bootstrap.sh
+# Follow what's happening (optional — Ctrl-C just detaches, containers keep running):
+docker compose logs -f pipeline superset-provisioner
 
-# 3. (First Superset run only) provision datasets/charts/dashboards
-.venv/Scripts/python dashboard/superset/setup_datasets.py
-.venv/Scripts/python dashboard/superset/setup_charts.py
-.venv/Scripts/python dashboard/superset/setup_dashboards.py
-
-# 4. MCP server (ad-hoc, stdio) — used by Claude Desktop / Claude Code
+# 2. MCP server (ad-hoc, stdio) — used by Claude Desktop / Claude Code
 docker compose run --rm mcp
 ```
 

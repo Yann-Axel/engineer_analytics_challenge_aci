@@ -38,11 +38,7 @@ flowchart TB
 ## 3. Reproducibility
 
 ```bash
-docker compose up -d superset
-bash dashboard/superset/bootstrap.sh
-.venv/Scripts/python dashboard/superset/setup_datasets.py
-.venv/Scripts/python dashboard/superset/setup_charts.py
-.venv/Scripts/python dashboard/superset/setup_dashboards.py
+docker compose up --build -d superset superset-provisioner
 ```
 
 Login `admin / admin` at <http://localhost:8088>. Each dashboard at `/superset/dashboard/<slug>/`.

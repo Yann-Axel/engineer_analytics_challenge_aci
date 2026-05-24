@@ -15,6 +15,7 @@ Page → Dashboard mapping:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import uuid
@@ -22,7 +23,30 @@ from dataclasses import dataclass
 
 import requests
 
-SUPERSET_URL = "http://localhost:8088"
+SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088")
+# When this script runs *inside* a container that mounts the Superset
+# `superset_home` volume, we can open the SQLite metastore directly.
+# Otherwise (host mode) we fall back to `docker exec airline-superset`.
+SUPERSET_DB_PATH = os.environ.get("SUPERSET_DB_PATH")  # e.g. /app/superset_home/superset.db
+
+
+def _run_metastore_query(sql: str) -> list[tuple]:
+    """Run a SELECT against Superset's SQLite metastore. Returns list of rows."""
+    if SUPERSET_DB_PATH:
+        import sqlite3
+        con = sqlite3.connect(SUPERSET_DB_PATH)
+        try:
+            return list(con.execute(sql))
+        finally:
+            con.close()
+    result = subprocess.run(
+        ["docker", "exec", "airline-superset", "python", "-c",
+         f"import sqlite3, json; "
+         f"con=sqlite3.connect('/app/superset_home/superset.db'); "
+         f"print(json.dumps([list(r) for r in con.execute({sql!r})]))"],
+        capture_output=True, text=True, timeout=30, check=True,
+    )
+    return [tuple(r) for r in json.loads(result.stdout.strip().splitlines()[-1])]
 ADMIN_USER = "admin"
 ADMIN_PASS = "admin"
 
@@ -213,33 +237,21 @@ def build_native_filter() -> dict:
 def fetch_chart_name_to_id() -> dict[str, int]:
     """Return {slice_name: id} from the Superset metastore."""
     try:
-        result = subprocess.run(
-            ["docker", "exec", "airline-superset", "python", "-c",
-             "import sqlite3, json; "
-             "con=sqlite3.connect('/app/superset_home/superset.db'); "
-             "print(json.dumps({r[1]: r[0] for r in con.execute('SELECT id, slice_name FROM slices')}))"],
-            capture_output=True, text=True, timeout=30, check=True,
-        )
-        return json.loads(result.stdout.strip().splitlines()[-1])
-    except (subprocess.SubprocessError, json.JSONDecodeError) as e:
+        rows = _run_metastore_query("SELECT id, slice_name FROM slices")
+        return {name: id_ for (id_, name) in rows}
+    except Exception as e:
         print(f"  ! Cannot read chart names from metastore: {e}")
         return {}
 
 
 def fetch_existing_dashboard_slugs() -> set[str]:
     try:
-        result = subprocess.run(
-            ["docker", "exec", "airline-superset", "python", "-c",
-             "import sqlite3, json; "
-             "con=sqlite3.connect('/app/superset_home/superset.db'); "
-             "print(json.dumps([r[0] for r in con.execute('SELECT slug FROM dashboards WHERE slug IS NOT NULL')]))"],
-            capture_output=True, text=True, timeout=30, check=False,
+        rows = _run_metastore_query(
+            "SELECT slug FROM dashboards WHERE slug IS NOT NULL"
         )
-        if result.returncode == 0:
-            return set(json.loads(result.stdout.strip().splitlines()[-1]))
+        return {r[0] for r in rows}
     except Exception:
-        pass
-    return set()
+        return set()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -354,15 +366,11 @@ class SupersetClient:
 
 def get_dashboard_id_by_slug(slug: str) -> int | None:
     try:
-        result = subprocess.run(
-            ["docker", "exec", "airline-superset", "python", "-c",
-             f"import sqlite3; con=sqlite3.connect('/app/superset_home/superset.db'); "
-             f"r=con.execute('SELECT id FROM dashboards WHERE slug=?', ('{slug}',)).fetchone(); "
-             f"print(r[0] if r else '')"],
-            capture_output=True, text=True, timeout=30, check=True,
+        # slug is dev-controlled (defined in this file), safe to inline
+        rows = _run_metastore_query(
+            f"SELECT id FROM dashboards WHERE slug='{slug}'"
         )
-        out = result.stdout.strip()
-        return int(out) if out else None
+        return int(rows[0][0]) if rows else None
     except Exception:
         return None
 

@@ -13,13 +13,14 @@ Total: 18 charts, matching the four brief areas with their listed KPIs.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass
 from typing import Any
 
 import requests
 
-SUPERSET_URL = "http://localhost:8088"
+SUPERSET_URL = os.environ.get("SUPERSET_URL", "http://localhost:8088")
 ADMIN_USER = "admin"
 ADMIN_PASS = "admin"
 

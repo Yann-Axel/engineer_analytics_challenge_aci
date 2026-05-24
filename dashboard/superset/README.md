@@ -12,49 +12,46 @@ Lightweight Superset stack reading the dbt-built DuckDB file directly.
 ```bash
 cd dashboard/superset
 
-# 1. Build the image (Superset + duckdb-engine)
+# 1. Build the image (Superset + duckdb-engine + auto-init entrypoint)
 docker compose build
 
-# 2. Start Superset
+# 2. Start Superset — the container's entrypoint runs `db upgrade`,
+#    creates the admin user, and runs `init` automatically on first boot.
 docker compose up -d
-
-# 3. Initialise metastore + admin user (one-off)
-bash bootstrap.sh
 ```
 
 Then open <http://localhost:8088> — login `admin / admin`.
 
 ## Connect Superset to DuckDB and provision datasets
 
-Run the automated provisioning script (from the project root, with the venv activated):
+The cleanest path is to let the `superset-provisioner` compose service do it
+for you (run from the project root):
+
+```bash
+docker compose up -d superset-provisioner
+```
+
+This idempotently creates:
+- 1 database connection `airline-duckdb` → `/app/data/airline.duckdb` (read-only)
+- 19 datasets across `main_marts`, `main_intermediate`, `main_ontology` schemas
+- The full chart + dashboard catalogue (see below)
+
+If you prefer to run the scripts manually from the host venv (e.g. for
+debugging), each script honours `SUPERSET_URL` (default `http://localhost:8088`)
+and the host workflow works out-of-the-box because Superset publishes 8088:
 
 ```bash
 .venv/Scripts/python dashboard/superset/setup_datasets.py
+.venv/Scripts/python dashboard/superset/configure_datetime_columns.py
+.venv/Scripts/python dashboard/superset/setup_charts.py
+.venv/Scripts/python dashboard/superset/setup_dashboards.py
 ```
-
-It creates (idempotently):
-- 1 database connection `airline-duckdb` → `/app/data/airline.duckdb` (read-only)
-- 19 datasets across `main_marts`, `main_intermediate`, `main_ontology` schemas
-
-Re-running the script is safe: it detects existing resources via the API's
-422 "already exists" response and skips them.
 
 > Manual alternative (if you prefer the UI):
 > Settings → Database Connections → + Database → SQLAlchemy URI =
 > `duckdb:////app/data/airline.duckdb?access_mode=read_only`
 
-## Provision charts and dashboards
-
-```bash
-# 1. Set datetime columns on time-series datasets (one-shot)
-.venv/Scripts/python dashboard/superset/configure_datetime_columns.py
-
-# 2. Create the 34 charts
-.venv/Scripts/python dashboard/superset/setup_charts.py
-
-# 3. Create the 5 dashboards (attaches charts + applies layout)
-.venv/Scripts/python dashboard/superset/setup_dashboards.py
-```
+## Chart and dashboard catalogue
 
 Creates 34 charts grouped into 5 dashboards (idempotent on re-run):
 
@@ -115,4 +112,4 @@ docker compose down -v         # stops AND wipes metastore (fresh start next tim
 | SQLite metastore | Persisted in the `superset_home` volume; survives restarts |
 | Read-only DuckDB mount | Superset never writes to the analytical store |
 | `duckdb-engine` in custom image | Superset talks to DuckDB via SQLAlchemy |
-| Bootstrap script | Idempotent, encapsulates DB upgrade + admin + perms |
+| Auto-init entrypoint | `db upgrade` + `create-admin` + `init` run at container boot (idempotent) |

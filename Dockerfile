@@ -31,9 +31,14 @@ COPY dbt/ /app/dbt/
 COPY mcp_server/ /app/mcp_server/
 COPY data/ /app/data/
 COPY docker/ /app/docker/
+# Superset provisioning scripts — used by the `superset-provisioner`
+# compose service to create datasets/charts/dashboards after Superset boots.
+COPY dashboard/superset/ /app/dashboard/superset/
 
 RUN sed -i 's/\r$//' /app/docker/entrypoint-pipeline.sh \
- && chmod +x /app/docker/entrypoint-pipeline.sh
+                     /app/docker/entrypoint-provisioner.sh \
+ && chmod +x /app/docker/entrypoint-pipeline.sh \
+             /app/docker/entrypoint-provisioner.sh
 
 # Default to an interactive Python; compose services override `command`.
 CMD ["python"]
