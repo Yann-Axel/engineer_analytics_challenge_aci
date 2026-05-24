@@ -37,8 +37,6 @@ cd /app/dbt
 export DBT_PROFILES_DIR=.
 
 dbt deps
-dbt seed
-dbt snapshot
 dbt build
 dbt docs generate
 
