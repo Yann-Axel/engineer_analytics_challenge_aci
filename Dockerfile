@@ -32,7 +32,8 @@ COPY mcp_server/ /app/mcp_server/
 COPY data/ /app/data/
 COPY docker/ /app/docker/
 
-RUN chmod +x /app/docker/entrypoint-pipeline.sh
+RUN sed -i 's/\r$//' /app/docker/entrypoint-pipeline.sh \
+ && chmod +x /app/docker/entrypoint-pipeline.sh
 
 # Default to an interactive Python; compose services override `command`.
 CMD ["python"]
