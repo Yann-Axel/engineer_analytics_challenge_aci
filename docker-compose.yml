@@ -53,7 +53,13 @@ services:
     volumes:
       - ./dashboard/superset/superset_config.py:/app/pythonpath/superset_config.py:ro
       - superset_home:/app/superset_home
-      - ./dbt/airline.duckdb:/app/data/airline.duckdb:ro
+      # Bind-mount the whole dbt/ directory (not just the .duckdb file).
+      # Reason: on a fresh clone the .duckdb file does not exist yet (it is
+      # created by the pipeline service). Docker resolves bind-mount sources
+      # at container-creation time and silently creates *a directory* when
+      # the source path is missing — which then breaks dbt with
+      # "IO Error: ... Is a directory". Mounting the parent dir avoids that.
+      - ./dbt:/app/data:ro
     depends_on:
       pipeline:
         condition: service_completed_successfully
