@@ -26,7 +26,7 @@ erDiagram
     dim_date                ||--o{ fct_bookings          : "booking_date_sk"
     dim_date                ||--o{ fct_loyalty_events    : "event_date_sk"
     dim_date                ||--o{ fct_customer_feedback : "feedback_date_sk"
-    dim_customer_current    ||--o{ fct_bookings          : "customer_sk (SCD2 snap)"
+    dim_customer_current    ||--o{ fct_bookings          : "customer_sk (SCD2)"
     dim_customer_current    ||--o{ fct_loyalty_events    : "customer_sk"
     dim_customer_current    ||--o{ fct_customer_feedback : "customer_sk"
     dim_route               ||--o{ fct_flights           : "route_sk"
@@ -38,102 +38,75 @@ erDiagram
     fct_bookings            ||--o{ fct_ancillary_offers  : "booking_sk"
 ```
 
-Lecture en étoile : les `dim_*` (gauche) gravitent autour des `fct_*` (centre/droite) ; les surrogate keys `_sk` (générées par `dbt_utils.generate_surrogate_key`) matérialisent chaque branche de l'étoile.
+Surrogate keys (`_sk`) are generated with `dbt_utils.generate_surrogate_key`. Materialisations: `view` for staging, `table` for marts and ontology, `ephemeral` for intermediate helpers. **160 / 160 dbt tests PASS**.
 
-Three brief themes → mart coverage:
+**Theme → table coverage**:
 
 | Theme | Tables |
 |---|---|
-| Route optimization & growth | `fct_flights`, `dim_route`, `dim_aircraft`, `int_route_monthly_perf` |
-| Customer retention | `fct_bookings`, `fct_customer_feedback`, `dim_customer_current` (+ SCD2) |
+| Route optimisation & growth | `fct_flights`, `dim_route`, `dim_aircraft`, `int_route_monthly_perf` |
+| Customer retention | `fct_bookings`, `fct_customer_feedback`, `dim_customer_current` (SCD2) |
 | Upsell / cross-sell | `fct_ancillary_offers`, `fct_bookings`, `dim_fare` |
-
-Materialisations: `view` for staging, `table` for marts and ontology, `ephemeral` for intermediate helpers. **160 / 160 dbt tests PASS** after `dbt build`.
-
-```mermaid
-flowchart LR
-    SRC[(data/enriched<br/>parquet sources)] --> STG[stg_*<br/>views<br/>cast + rename]
-    STG --> INT[int_*<br/>ephemeral<br/>joins + pre-agg]
-    INT --> MARTS[dim_* / fct_*<br/>tables]
-    MARTS --> ONT[ont_*<br/>ontology concepts]
-    MARTS --> SEM[Semantic layer<br/>_semantic_models.yml<br/>_metrics.yml]
-    ONT --> BI[Superset dashboards]
-    SEM --> BI
-    MARTS --> MCP[MCP server<br/>Part 4]
-    ONT --> MCP
-
-    classDef mart fill:#dbeafe,stroke:#1e3a8a,color:#1e3a8a
-    classDef ont fill:#fef3c7,stroke:#92400e,color:#92400e
-    class MARTS mart
-    class ONT ont
-```
 
 ---
 
 ## 3. Semantic layer
 
-The brief asks for **core entities + KPI definitions + joins + naming conventions**. All four live in two YAML files:
+Everything the brief asks for (entities, KPI definitions, joins, naming) lives in two YAML files:
 
-| Brief item | Source of truth | Where |
-|---|---|---|
-| Core entities (Customer, Flight, Booking, Route, Feedback) | `dbt/models/semantic/_semantic_models.yml` | 5 semantic models |
-| Joins between entities | declared via `entities` (primary / foreign) in the same YAML | inline |
-| KPI definitions (the 10 from Part 1) | `dbt/models/semantic/_metrics.yml` | 10 metrics, each with formula |
-| Naming conventions | this document, §6 | below |
+| Brief item | Where |
+|---|---|
+| 5 core entities (Customer, Flight, Booking, Route, Feedback) | [`_semantic_models.yml`](../dbt/models/semantic/_semantic_models.yml) |
+| Joins between entities | declared as `entities` (primary / foreign) in the same file |
+| KPI definitions (10 from Part 1) | [`_metrics.yml`](../dbt/models/semantic/_metrics.yml) |
+| Naming conventions | §6 below |
 
-KPIs covered (mirror Part 1):
-`route_revenue`, `route_margin_pct`, `load_factor`, `delay_rate`, `cancellation_rate`, `repeat_booking_rate`, `loyalty_engagement`, `ancillary_attach_rate`, `customer_sentiment`, `recency_days`.
+KPIs: `route_revenue`, `route_margin_pct`, `load_factor`, `delay_rate`, `cancellation_rate`, `repeat_booking_rate`, `loyalty_engagement`, `ancillary_attach_rate`, `customer_sentiment`, `recency_days`.
 
 ---
 
 ## 4. Ontology — reasoning rules that classify business concepts
 
-The brief gives two examples: *High-Value At-Risk Customer* and *Strategic Underperforming Route*. Both are implemented as dbt models in `dbt/models/ontology/`:
+The brief names two concepts; we deliver both, plus three derived ones used by the Part-4 AI agent. All in [`dbt/models/ontology/`](../dbt/models/ontology/), with declarative rules in [`docs/05_ontology_rules.yml`](05_ontology_rules.yml).
 
-| Concept | Rule (declarative) |
+| Concept | Rule |
 |---|---|
-| **HighValueAtRiskCustomer** | `monetary_total_percentile ≥ 0.60` ∧ `recency_percentile ≥ 0.60` ∧ (complaint OR negative sentiment OR churn_risk ≥ 0.40) |
-| **StrategicUnderperformingRoute** | `is_strategic = true` ∧ `margin_percentile_among_strategic ≤ 0.50` ∧ `load_factor_12m ≥ 0.65` |
+| **HighValueAtRiskCustomer** *(brief)* | `monetary_pct ≥ 0.60` ∧ `recency_pct ≥ 0.60` ∧ (complaint ∨ negative sentiment ∨ `churn_risk ≥ 0.40`) |
+| **StrategicUnderperformingRoute** *(brief)* | `is_strategic = true` ∧ `margin_pct_among_strategic ≤ 0.50` ∧ `load_factor_12m ≥ 0.65` |
+| PremiumUpsellCandidate | Standard/Business + Silver/Gold + top-quartile upgrade acceptance |
+| LoyalDetractor | Gold tier + ≥4 segments/12m + `avg_sentiment_6m < −0.3` |
+| IROPSHeavyRoute | top-quintile disruption rate **OR** `cancel_rate_12m > 5%` |
 
-The full rules — machine-readable, language-agnostic — are in `docs/05_ontology_rules.yml`. Three additional concepts (`PremiumUpsellCandidate`, `LoyalDetractor`, `IROPSHeavyRoute`) are kept in the same folder because the Part-4 AI agent surfaces them; they share the same SQL-plus-YAML pattern.
-
-**Why this format and not OWL/SHACL?** Because the consumer is a BI tool and an LLM, not a triple store. SQL + YAML is readable by all three (humans, dbt, MCP) without an extra runtime.
+**Why SQL + YAML and not OWL/SHACL?** The consumers are a BI tool and an LLM, not a triple store. SQL + YAML is readable by humans, dbt, and the MCP server — no extra runtime needed.
 
 ---
 
 ## 5. Unstructured-data integration
 
-The brief lists four examples — *sentiment scoring, complaint categories, route-level issue themes, or semantic tags*. We deliver the first one as the load-bearing demonstration; the others are by-products in the same pipeline.
-
-**Pipeline (dbt-native, rule-based, explainable):**
+The brief lists four examples (sentiment, complaint categories, route themes, semantic tags). We deliver all four in one dbt-native, rule-based, **fully explainable** pipeline.
 
 ```mermaid
 flowchart TB
-    A[(customer_feedback.parquet<br/>3,000 raw FR/EN texts)]
-    A --> B[stg_customer_feedback<br/>normalise text]
-    B --> C[int_feedback_tokens<br/>tokenise]
-    C --> D[int_feedback_sentiment<br/>lexicon-based score -1..+1<br/>+ negation 2-token window]
-    C --> E[int_feedback_category<br/>complaint taxonomy]
-    C --> F[int_feedback_tags<br/>semantic tags]
-    D --> G[fct_customer_feedback<br/>joinable to dim_customer, dim_route]
+    A[(customer_feedback.parquet<br/>3,000 raw FR/EN)] --> B[stg_customer_feedback]
+    B --> C[int_feedback_tokens]
+    C --> D[int_feedback_sentiment<br/>lexicon score [-1,+1]<br/>+ 2-token negation window]
+    C --> E[int_feedback_category<br/>taxonomy]
+    C --> F[int_feedback_tags]
+    D --> G[fct_customer_feedback]
     E --> G
     F --> G
-    G --> H[int_route_complaint_themes<br/>route-level rollup]
+    G --> H[int_route_complaint_themes]
 
-    classDef src fill:#f3f4f6,stroke:#374151
     classDef out fill:#dcfce7,stroke:#166534,color:#166534
-    class A src
     class G,H out
 ```
 
-**Worked example** — what the input looks like and what the model derives:
-
 | `raw_text` (input) | `sentiment_score` | `sentiment_label` |
 |---|---|---|
-| `Bagage perdu entre Paris et Abidjan, service injoignable.` | −1.0 | negative |
-| `Surclassement gratuit en classe affaires, expérience fantastique.` | +1.0 | positive |
+| Bagage perdu entre Paris et Abidjan, service injoignable. | −1.0 | negative |
+| Surclassement gratuit en classe affaires, expérience fantastique. | +1.0 | positive |
 
-The lexicon (145 polarised words FR+EN), the complaint taxonomy and the negation list live in `dbt/seeds/`. We picked rule-based over a transformer model so every score is traceable to specific words in the source row — an exec can defend any number on the dashboard.
+The lexicon (145 polarised FR+EN words), complaint taxonomy (62) and negation list (18) live in [`dbt/seeds/`](../dbt/seeds/). **Why rule-based, not a transformer?** Every score is traceable to specific words in the source row — an exec can defend any number on the dashboard. A black-box BERT cannot.
 
 ---
 
@@ -146,12 +119,9 @@ The lexicon (145 polarised words FR+EN), the complaint taxonomy and the negation
 | `dim_*` | Dimension (conformed) |
 | `fct_*` | Fact (grain documented in each model) |
 | `ont_*` | Ontology concept |
-| `_sk` | Surrogate key (integer, generated by `dbt_utils.generate_surrogate_key`) |
-| `_id` | Natural key (varchar) — carried for traceability |
-| `_date` | Date (no time) |
-| `_at` | Timestamp |
-| `_usd` | USD monetary amount |
-| `_pct` | Fraction in `[0, 1]` |
+| `_sk` / `_id` | Surrogate key (int) / natural key (varchar) |
+| `_date` / `_at` | Date / timestamp |
+| `_usd` / `_pct` | USD amount / fraction in [0, 1] |
 | `is_*`, `has_*` | Booleans |
 
-Snake case everywhere. Singular vs plural follows the dbt community convention: tables singular where natural (`dim_route`) but plural when colloquial (`fct_bookings`).
+Snake case throughout. Singular table names where natural (`dim_route`), plural when colloquial (`fct_bookings`).

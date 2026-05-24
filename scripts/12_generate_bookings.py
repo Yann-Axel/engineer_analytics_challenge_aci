@@ -80,7 +80,7 @@ def main() -> None:
     customers = assign_activity_buckets(customers, rng)
     # Pool of customer_ids with weights for sampling.
     eligible = customers[customers["target_bookings"] > 0].copy()
-    weights = eligible["target_bookings"].astype(float).values
+    weights = eligible["target_bookings"].astype(float).to_numpy(copy=True)
     weights /= weights.sum()
     cust_ids = eligible["customer_id"].values
 

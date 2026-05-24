@@ -6,13 +6,13 @@ sources:
       Enriched synthetic dataset produced by `scripts/run_all.py` (Part 1).
       14 entities materialised as Parquet files under `data/enriched/`.
       The raw starter Excel is preserved 1:1 in `data/raw/` but not consumed by dbt.
-    meta:
-      owner: analytics-engineering
-      contains_pii: false
     # External Parquet files read via DuckDB's native parquet reader.
     # The path is resolved relative to the dbt project root (dbt/).
     config:
-      external_location: "../data/enriched/{name}.parquet"
+      meta:
+        owner: analytics-engineering
+        contains_pii: false
+        external_location: "../data/enriched/{name}.parquet"
 
     tables:
       - name: airports

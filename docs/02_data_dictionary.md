@@ -1,11 +1,8 @@
-# Data dictionary — supporting reference for Part 2 modelling
+# Data dictionary — `data/enriched/` reference
 
-> **Scope**: column-level reference for every source the dbt project (Part 2) reads. Produced as an aid to the modelling work; **not a Part-1 deliverable per se** — the Part-1 brief only asks for assumptions documentation (covered in `docs/03_assumptions.md`).
->
-> **Layering convention**:
-> - `data/raw/` — immutable 1:1 copy of the starter Excel (5 entities)
-> - `data/enriched/` — synthetic data + scaled starter (this dictionary's scope)
-> - dbt staging normalises & renames in Part 2
+Column-level reference for every parquet the Part-2 dbt project consumes. Reference doc, not a Part-1 deliverable (assumptions live in [03_assumptions.md](03_assumptions.md)).
+
+**Layering**: `data/raw/` (immutable starter Excel) → `data/enriched/` (this doc) → dbt staging (rename + cast).
 
 ## Source overview (entities & foreign keys)
 
