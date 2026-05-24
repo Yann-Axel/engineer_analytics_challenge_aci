@@ -77,6 +77,13 @@ services:
   # 19 datasets, sets time-grain columns, then creates 34 charts and 5
   # dashboards. Idempotent — re-runs skip what already exists.
   superset-provisioner:
+    # Reuses the `airline-pipeline` image (same Python + setup scripts).
+    # Build block is required so a fresh `docker compose up --build` knows
+    # how to produce the image — without it Docker tries to *pull* from a
+    # registry and fails with "pull access denied".
+    build:
+      context: .
+      dockerfile: Dockerfile
     image: airline-pipeline:latest
     container_name: airline-superset-provisioner
     depends_on:
