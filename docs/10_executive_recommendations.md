@@ -20,20 +20,20 @@ pie showData title Budget allocation — next 12 months
 
 ## Three actions
 
-| # | Action | Why | Expected impact |
-|---|---|---|---|
-| 1 | Ops task force on **R015 / R005 / R008 / R004 / R006** (5 IROPS-heavy routes) | 20–35 % disruption rate vs ~14 % network; 5–7 % cancel on three | ~30 cancellations avoided/yr ≈ **$200K + sentiment uplift** |
-| 2 | Retention campaign on the **20 high-value at-risk customers** | Combined LTV **$13.6 M** (avg $682 K); each carries ≥1 complaint or negative sentiment | Save 50 % ≈ **$0.7 M/yr recurring** |
-| 3 | Premium upgrade offers on the **48 candidates** (`ont_premium_upsell_candidate`) | Acceptance **17 % vs 12 % network** | 5 offers × 17 % ≈ **$1.5–3 M new ancillary** |
+| # | Action                                                                            | Why                                                                                  | Expected impact                                              |
+| :-: | :-------------------------------------------------------------------------------- | :----------------------------------------------------------------------------------- | :----------------------------------------------------------- |
+| 1 | Ops task force on **R015 / R005 / R008 / R004 / R006** (5 IROPS-heavy routes)     | 20–35 % disruption rate vs ~14 % network; 5–7 % cancel on three                      | ~30 cancellations avoided/yr ≈ **$200K + sentiment uplift**  |
+| 2 | Retention campaign on the **20 high-value at-risk customers**                     | Combined LTV **$13.6 M** (avg $682 K); each carries ≥1 complaint or negative sentiment | Save 50 % ≈ **$0.7 M/yr recurring**                          |
+| 3 | Premium upgrade offers on the **48 candidates** (`ont_premium_upsell_candidate`)  | Acceptance **17 % vs 12 % network**                                                  | 5 offers × 17 % ≈ **$1.5–3 M new ancillary**                 |
 
 ## Network headline (12 m)
 
-| KPI | Value | KPI | Value |
-|---|---|---|---|
-| Revenue | $241 M | OTP15 | 66.5 % |
-| Margin % | 77.9 % | Cancellation | 3.6 % |
-| Load Factor | 71.9 % | Ancillary attach | 80.2 % |
-| Premium mix | 22.0 % | Customer sentiment | −0.10 |
+| KPI         | Value  | KPI                 | Value  |
+| :---------- | :----- | :------------------ | :----- |
+| Revenue     | $241 M | OTP15               | 66.5 % |
+| Margin %    | 77.9 % | Cancellation        | 3.6 %  |
+| Load Factor | 71.9 % | Ancillary attach    | 80.2 % |
+| Premium mix | 22.0 % | Customer sentiment  | −0.10  |
 
 ## 90-day KPI targets
 

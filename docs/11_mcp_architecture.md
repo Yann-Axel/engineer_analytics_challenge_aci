@@ -28,11 +28,11 @@ flowchart LR
 
 ## Three tools, three brief questions
 
-| Tool | Answers |
-|---|---|
-| `list_routes_with_kpis(period_months, limit)` | *Which routes deserve more budget next quarter?* |
-| `list_high_value_at_risk_customers(limit)` | *Which high-value customers are at risk?* |
-| `search_feedback_text(route_id, sentiment_label, limit)` | *What complaints drive low satisfaction on route X?* — **unstructured source** |
+| Tool                                                      | Answers                                                                          |
+| :-------------------------------------------------------- | :------------------------------------------------------------------------------- |
+| `list_routes_with_kpis(period_months, limit)`             | *Which routes deserve more budget next quarter?*                                 |
+| `list_high_value_at_risk_customers(limit)`                | *Which high-value customers are at risk?*                                        |
+| `search_feedback_text(route_id, sentiment_label, limit)`  | *What complaints drive low satisfaction on route X?* — **unstructured source**   |
 
 Every tool returns an **audit envelope** (`sql`, `params`, `row_count`, `rows`) so an exec can verify what was queried. DuckDB opens read-only, parameters are bound, results capped at 1,000 rows.
 
@@ -47,13 +47,13 @@ To wire Claude Desktop: paste the block from [`mcp_server/claude_desktop_config.
 
 ## Video — 2-minute script
 
-| Time | On screen | Voice-over |
-|---|---|---|
-| 0:00–0:20 | Claude Desktop with 3 MCP tools listed | *"Three tools, exposed via MCP, answer the brief's three growth-allocation questions."* |
-| 0:20–0:35 | This architecture diagram | *"FastMCP, stdio, read-only DuckDB, audit envelope on every call."* |
-| 0:35–0:55 | Type: *Which routes deserve more budget next quarter?* | *"Tool 1 returns each route with margin, load factor, OTP, cancellation."* |
-| 0:55–1:15 | Type: *List top 5 high-value customers at risk.* | *"Tool 2 — the ontology has already flagged 20 customers with dissatisfaction signals."* |
-| 1:15–1:50 | Type: *What complaints drive low satisfaction on R005? Quote a few customers verbatim.* | *"Tool 3 — search_feedback_text returns raw FR/EN feedback. The unstructured source."* |
-| 1:50–2:00 | GitHub URL | *"Full code in mcp_server/."* |
+| Time      | On screen                                                                                | Voice-over                                                                                |
+| :-------- | :--------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------- |
+| 0:00–0:20 | Claude Desktop with 3 MCP tools listed                                                   | *"Three tools, exposed via MCP, answer the brief's three growth-allocation questions."*   |
+| 0:20–0:35 | This architecture diagram                                                                | *"FastMCP, stdio, read-only DuckDB, audit envelope on every call."*                       |
+| 0:35–0:55 | Type: *Which routes deserve more budget next quarter?*                                   | *"Tool 1 returns each route with margin, load factor, OTP, cancellation."*                |
+| 0:55–1:15 | Type: *List top 5 high-value customers at risk.*                                         | *"Tool 2 — the ontology has already flagged 20 customers with dissatisfaction signals."*  |
+| 1:15–1:50 | Type: *What complaints drive low satisfaction on R005? Quote a few customers verbatim.*  | *"Tool 3 — search_feedback_text returns raw FR/EN feedback. The unstructured source."*    |
+| 1:50–2:00 | GitHub URL                                                                               | *"Full code in mcp_server/."*                                                             |
 
 Recording: ShareX or OBS, MP4 720p, save to `docs/mcp_walkthrough.mp4`.

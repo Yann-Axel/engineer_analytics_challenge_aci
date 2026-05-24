@@ -81,12 +81,12 @@ DBT_PROFILES_DIR=. ../.venv/Scripts/dbt docs serve    # open the lineage site
 
 The brief asks for four things; here is how each is met:
 
-| Brief requirement | Deliverable |
-|---|---|
-| Describe the 5 airline business domains | [docs/01_business_framing.md §1](docs/01_business_framing.md) |
-| List KPIs guiding decisions | [docs/01_business_framing.md §2](docs/01_business_framing.md) — 10 KPIs covering the 9 brief examples |
+| Brief requirement                                   | Deliverable                                                                               |
+| :-------------------------------------------------- | :---------------------------------------------------------------------------------------- |
+| Describe the 5 airline business domains             | [docs/01_business_framing.md §1](docs/01_business_framing.md)                             |
+| List KPIs guiding decisions                         | [docs/01_business_framing.md §2](docs/01_business_framing.md) — 10 KPIs covering the 9 brief examples |
 | Generate realistic data with ≥1 unstructured source | `data/enriched/*.parquet`, incl. `customer_feedback.parquet` (3,000 FR/EN free-text rows) |
-| Document assumptions | [docs/03_assumptions.md](docs/03_assumptions.md) — 5 load-bearing assumptions |
+| Document assumptions                                | [docs/03_assumptions.md](docs/03_assumptions.md) — 5 load-bearing assumptions             |
 
 Regenerate in one command: `python scripts/run_all.py` (~2 min, seed=42, fully reproducible).
 
@@ -96,13 +96,13 @@ Regenerate in one command: `python scripts/run_all.py` (~2 min, seed=42, fully r
 
 The brief asks for four things; here is how each is met:
 
-| Brief requirement | Deliverable |
-|---|---|
-| Build a model supporting the 3 themes | Star schema in `dbt/models/marts/` — 6 dim × 5 fct |
-| Justify Star / DV / Hybrid choice | [docs/04_modeling_choices.md §1](docs/04_modeling_choices.md) — trade-off table |
-| Semantic layer (entities, KPIs, joins, naming) | `_semantic_models.yml` + `_metrics.yml` (10 KPIs aligned with Part 1) + naming conventions in `04_modeling_choices.md §6` |
-| Ontology-inspired layer with reasoning rules | 2 concepts named in the brief (`ont_high_value_at_risk_customer`, `ont_strategic_underperforming_route`) implemented as SQL + declarative rules in [docs/05_ontology_rules.yml](docs/05_ontology_rules.yml) |
-| Show how unstructured is integrated | Lexicon-based sentiment scoring → `fct_customer_feedback`. Pipeline + worked example in `04_modeling_choices.md §5` |
+| Brief requirement                              | Deliverable                                                                                                                                                                                                  |
+| :--------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build a model supporting the 3 themes          | Star schema in `dbt/models/marts/` — 6 dim × 5 fct                                                                                                                                                           |
+| Justify Star / DV / Hybrid choice              | [docs/04_modeling_choices.md §1](docs/04_modeling_choices.md) — trade-off table                                                                                                                              |
+| Semantic layer (entities, KPIs, joins, naming) | `_semantic_models.yml` + `_metrics.yml` (10 KPIs aligned with Part 1) + naming conventions in `04_modeling_choices.md §6`                                                                                    |
+| Ontology-inspired layer with reasoning rules   | 2 concepts named in the brief (`ont_high_value_at_risk_customer`, `ont_strategic_underperforming_route`) implemented as SQL + declarative rules in [docs/05_ontology_rules.yml](docs/05_ontology_rules.yml)  |
+| Show how unstructured is integrated            | Lexicon-based sentiment scoring → `fct_customer_feedback`. Pipeline + worked example in `04_modeling_choices.md §5`                                                                                          |
 
 Run: `cd dbt && dbt build` → **160 / 160 tests PASS in ~12 s**.
 
@@ -110,15 +110,15 @@ Run: `cd dbt && dbt build` → **160 / 160 tests PASS in ~12 s**.
 
 The brief asks for one dashboard covering four areas, with screenshots and a one-page recommendation. Here is how each requirement is met:
 
-| Brief requirement | Deliverable |
-|---|---|
-| Build an Executive Growth Allocation Dashboard | Apache Superset 4.1.2 in Docker, reading `dbt/airline.duckdb` |
-| Network & profitability area | [`network-profitability`](docs/screenshots/01_network_profitability.png) — 5 charts (revenue, opportunity matrix, OTP/cancel trends, RASK, disruptions) |
-| Customer & retention area | [`customer-retention`](docs/screenshots/02_customer_retention.png) — 5 charts (segment/loyalty, at-risk, complaint heatmap, sentiment trend, repeat rate) |
-| Upsell & cross-sell area | [`upsell-crosssell`](docs/screenshots/03_upsell_crosssell.png) — 4 charts (upgrade conv, attach, rev/pax, premium candidates) |
-| Decision layer | [`decision-layer`](docs/screenshots/04_decision_layer.png) — 4 ontology-driven tables (Grow / Defend / Retain / Prioritise) |
-| Screenshots | [docs/screenshots/](docs/screenshots/) — 4 PNG (one per area) |
-| One page of executive recommendations | [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md) — A4-printable verdict + 3 actions + 90-day KPI targets |
+| Brief requirement                              | Deliverable                                                                                                                                                |
+| :--------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build an Executive Growth Allocation Dashboard | Apache Superset 4.1.2 in Docker, reading `dbt/airline.duckdb`                                                                                              |
+| Network & profitability area                   | [`network-profitability`](docs/screenshots/01_network_profitability.png) — 5 charts (revenue, opportunity matrix, OTP/cancel trends, RASK, disruptions)    |
+| Customer & retention area                      | [`customer-retention`](docs/screenshots/02_customer_retention.png) — 5 charts (segment/loyalty, at-risk, complaint heatmap, sentiment trend, repeat rate)  |
+| Upsell & cross-sell area                       | [`upsell-crosssell`](docs/screenshots/03_upsell_crosssell.png) — 4 charts (upgrade conv, attach, rev/pax, premium candidates)                              |
+| Decision layer                                 | [`decision-layer`](docs/screenshots/04_decision_layer.png) — 4 ontology-driven tables (Grow / Defend / Retain / Prioritise)                                |
+| Screenshots                                    | [docs/screenshots/](docs/screenshots/) — 4 PNG (one per area)                                                                                              |
+| One page of executive recommendations          | [docs/10_executive_recommendations.md](docs/10_executive_recommendations.md) — A4-printable verdict + 3 actions + 90-day KPI targets                       |
 
 **Total: 4 dashboards × 18 charts**, all provisioned via the REST API by versioned Python scripts (`dashboard/superset/setup_*.py`). Design rationale: [docs/09_dashboard_design.md](docs/09_dashboard_design.md).
 
@@ -130,27 +130,27 @@ Spin-up commands in [docs/09_dashboard_design.md §3](docs/09_dashboard_design.m
 
 The brief asks for a small MCP server exposing structured + unstructured data with a few grounded questions, plus a video and a brief architecture explanation.
 
-| Brief requirement | Deliverable |
-|---|---|
-| Small MCP server (or equivalent tool layer) | [`mcp_server/`](mcp_server/) — Python FastMCP, stdio, 3 tools inline in `server.py` |
-| AI assistant can use it | [`mcp_server/claude_desktop_config.json`](mcp_server/claude_desktop_config.json) |
-| Structured + ≥ 1 unstructured source | 2 structured tools (`list_routes_with_kpis`, `list_high_value_at_risk_customers`) + 1 unstructured (`search_feedback_text` → raw FR/EN text) |
-| Q1 — *"Which routes deserve more budget?"* | `list_routes_with_kpis` |
-| Q2 — *"Which high-value customers are at risk?"* | `list_high_value_at_risk_customers` |
-| Q3 — *"Complaints on route X?"* | `search_feedback_text` (the unstructured-source tool) |
-| Video + brief architecture | Script + architecture in [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md) |
+| Brief requirement                                 | Deliverable                                                                                                                                  |
+| :------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| Small MCP server (or equivalent tool layer)       | [`mcp_server/`](mcp_server/) — Python FastMCP, stdio, 3 tools inline in `server.py`                                                          |
+| AI assistant can use it                           | [`mcp_server/claude_desktop_config.json`](mcp_server/claude_desktop_config.json)                                                             |
+| Structured + ≥ 1 unstructured source              | 2 structured tools (`list_routes_with_kpis`, `list_high_value_at_risk_customers`) + 1 unstructured (`search_feedback_text` → raw FR/EN text) |
+| Q1 — *"Which routes deserve more budget?"*        | `list_routes_with_kpis`                                                                                                                      |
+| Q2 — *"Which high-value customers are at risk?"*  | `list_high_value_at_risk_customers`                                                                                                          |
+| Q3 — *"Complaints on route X?"*                   | `search_feedback_text` (the unstructured-source tool)                                                                                        |
+| Video + brief architecture                        | Script + architecture in [docs/11_mcp_architecture.md](docs/11_mcp_architecture.md)                                                          |
 
 Run: `python -m mcp_server.smoke_test` answers the three questions end-to-end via the real MCP protocol. Quick-start: [`mcp_server/README.md`](mcp_server/README.md).
 
 ## Senior criteria — status (FINAL)
 
-| Brief criterion | Status |
-|---|---|
-| Deliberate modeling trade-offs | ✅ Star + SCD2 ciblé justified; Superset chosen over Streamlit; specialised tools over run_sql |
-| Reusable semantic layer | ✅ 10 KPIs in `_metrics.yml` + 5 entities in `_semantic_models.yml` |
-| Ontology-inspired inference | ✅ 2 brief-named concepts in SQL + declarative YAML rules |
-| **Robust AI tooling** | ✅ 3 specialised tools + Pydantic validation + read-only DB + audit envelope + E2E smoke test |
-| Strong documentation | ✅ 8 docs in `/docs` + screenshots |
+| Brief criterion                 | Status                                                                                          |
+| :------------------------------ | :---------------------------------------------------------------------------------------------- |
+| Deliberate modeling trade-offs  | ✅ Star + SCD2 ciblé justified; Superset chosen over Streamlit; specialised tools over run_sql  |
+| Reusable semantic layer         | ✅ 10 KPIs in `_metrics.yml` + 5 entities in `_semantic_models.yml`                             |
+| Ontology-inspired inference     | ✅ 2 brief-named concepts in SQL + declarative YAML rules                                       |
+| **Robust AI tooling**           | ✅ 3 specialised tools + Pydantic validation + read-only DB + audit envelope + E2E smoke test   |
+| Strong documentation            | ✅ 8 docs in `/docs` + screenshots                                                              |
 
 ## Decisions log
 

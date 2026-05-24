@@ -13,12 +13,12 @@ The 5 starter entities (airports, routes, customers, flights, bookings) sit unto
 ### 3. Customer activity distribution
 The starter had 100 % active customers (unrealistic). We add 700 new customers and impose a long-tail:
 
-| Bucket | Share | Bookings / 24 m |
-|---|---|---|
-| Inactive | 20 % | 0 |
-| Occasional | 50 % | 1–5 |
-| Regular | 25 % | 6–20 |
-| Power user | 5 % | 21–60 |
+| Bucket     | Share | Bookings / 24 m |
+| :--------- | :---- | :-------------- |
+| Inactive   | 20 %  | 0               |
+| Occasional | 50 %  | 1–5             |
+| Regular    | 25 %  | 6–20            |
+| Power user | 5 %   | 21–60           |
 
 → ~80 % active base, aligned with flag-carrier benchmarks. Critical for the **Repeat Booking Rate** and **Recency** KPIs.
 

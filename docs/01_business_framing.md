@@ -4,13 +4,13 @@
 
 ## 1. The five domains and how they map to the brief's three themes
 
-| Domain | Owner | Strategic question (12 m) |
-|---|---|---|
-| Network & Revenue Mgmt | VP Network | Open / reinforce / close which routes? |
-| Operations | COO | Which routes lose margin to ops, not demand? |
-| Commercial / Pricing | Revenue Mgr | Fare mix, dynamic pricing, channel? |
-| Customer & Loyalty | CCO | Retain / upgrade / reactivate? |
-| Ancillary Revenue | Ancillary Mgr | What to push, to whom, when? |
+| Domain                 | Owner         | Strategic question (12 m)                       |
+| :--------------------- | :------------ | :---------------------------------------------- |
+| Network & Revenue Mgmt | VP Network    | Open / reinforce / close which routes?          |
+| Operations             | COO           | Which routes lose margin to ops, not demand?    |
+| Commercial / Pricing   | Revenue Mgr   | Fare mix, dynamic pricing, channel?             |
+| Customer & Loyalty     | CCO           | Retain / upgrade / reactivate?                  |
+| Ancillary Revenue      | Ancillary Mgr | What to push, to whom, when?                    |
 
 - **Theme 1 — Route optimisation & growth** ← Network + Operations
 - **Theme 2 — Customer retention** ← Customer + Operations (delays drive churn) + unstructured feedback
@@ -35,17 +35,17 @@ flowchart LR
 
 The brief lists 9 example KPIs. We cover all of them plus **Recency** (the basis of the RFM churn signal).
 
-| KPI | Formula | Theme |
-|---|---|---|
-| Route Revenue | `SUM(ticket + ancillary)` on Flown bookings | Route |
-| Route Margin % | `(Revenue − DOC) / Revenue` | Route |
-| Load Factor | `SUM(pax) / SUM(seats)` | Route |
-| Delay Rate (OTP-inv) | `delay_min > 15 / operated` | Route |
-| Cancellation Rate | `cancelled / scheduled` | Route |
-| Repeat Booking Rate | `≥2 bookings / active customer / 12m` | Retention |
-| Recency (RFM-R) | days since last booking | Retention |
-| Loyalty Engagement | points earned per active member / 12m | Retention |
-| Ancillary Attach Rate | `bookings with ancillary > 0 / bookings` | Upsell |
-| Customer Sentiment | mean score derived from feedback text | Retention / Route |
+| KPI                   | Formula                                       | Theme             |
+| :-------------------- | :-------------------------------------------- | :---------------- |
+| Route Revenue         | `SUM(ticket + ancillary)` on Flown bookings   | Route             |
+| Route Margin %        | `(Revenue − DOC) / Revenue`                   | Route             |
+| Load Factor           | `SUM(pax) / SUM(seats)`                       | Route             |
+| Delay Rate (OTP-inv)  | `delay_min > 15 / operated`                   | Route             |
+| Cancellation Rate     | `cancelled / scheduled`                       | Route             |
+| Repeat Booking Rate   | `≥2 bookings / active customer / 12m`         | Retention         |
+| Recency (RFM-R)       | days since last booking                       | Retention         |
+| Loyalty Engagement    | points earned per active member / 12m         | Retention         |
+| Ancillary Attach Rate | `bookings with ancillary > 0 / bookings`      | Upsell            |
+| Customer Sentiment    | mean score derived from feedback text         | Retention / Route |
 
 Each formula is the source of truth materialised in [dbt/models/semantic/_metrics.yml](../dbt/models/semantic/_metrics.yml) (Part 2).
