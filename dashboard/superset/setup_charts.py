@@ -3,12 +3,12 @@ Provision the Air Côte d'Ivoire dashboard charts in Superset via the REST API.
 Idempotent: re-running detects existing charts by slice_name and skips them.
 
 Charts are organised by page, one page per brief area (no extras):
-  - Page 1: Network & Profitability   (5 charts) — revenue, margin, LF, OTP, cancel, opportunity matrix
+  - Page 1: Network & Profitability   (6 charts) — revenue, opportunity matrix + drilldown, OTP/cancel, RASK, disruptions
   - Page 2: Customer & Retention      (5 charts) — segmentation, at-risk, complaint themes, sentiment, loyalty
   - Page 3: Upsell & Cross-sell       (4 charts) — upgrade conversion, attach rate, ARPP, upsell candidates
   - Page 4: Decision Layer            (4 charts) — routes to grow / defend, customers to retain, offers to prioritize
 
-Total: 18 charts, matching the four brief areas with their listed KPIs.
+Total: 19 charts, matching the four brief areas with their listed KPIs.
 """
 from __future__ import annotations
 
@@ -128,7 +128,10 @@ def build_charts() -> list[ChartSpec]:
         dataset="int_route_monthly_perf",
         viz_type="bubble",
         page_tag=PAGE,
-        description="Margin % vs Load Factor per route — bubble size = revenue.",
+        description=(
+            "Margin % vs Load Factor per route — bubble size = revenue. "
+            "Click a bubble to drill the whole page down to that route."
+        ),
         params={
             "viz_type": "bubble",
             "entity": "route_id",
@@ -143,6 +146,51 @@ def build_charts() -> list[ChartSpec]:
             "x_axis_format": ".0%",
             "y_axis_format": ".0%",
             "show_legend": True,
+            # Emit a cross-filter on route_id when a bubble is clicked,
+            # so every other chart on the page filters to that route.
+            "emit_filter": True,
+        },
+    ))
+
+    charts.append(ChartSpec(
+        name="Net · Route KPI Drilldown",
+        dataset="int_route_monthly_perf",
+        viz_type="table",
+        page_tag=PAGE,
+        description=(
+            "Monthly breakdown of all KPIs per route. "
+            "Pairs with the Route Opportunity Matrix — when a route is "
+            "selected (clicked or via the Route filter), this table reveals "
+            "its full KPI history."
+        ),
+        params={
+            "viz_type": "table",
+            "query_mode": "aggregate",
+            "groupby": ["route_id", "period_month"],
+            "metrics": [
+                metric_sum("revenue_usd", "Revenue"),
+                metric_sql(
+                    "SUM(margin_usd) / NULLIF(SUM(revenue_usd), 0)",
+                    "Margin %",
+                ),
+                metric_sql(
+                    "SUM(total_pax) * 1.0 / NULLIF(SUM(total_seat_capacity), 0)",
+                    "Load Factor",
+                ),
+                metric_avg("otp15_rate", "OTP15"),
+                metric_avg("cancellation_rate", "Cancel Rate"),
+                metric_sum("total_pax", "Pax"),
+                metric_sum("flights_scheduled", "Flights"),
+            ],
+            "row_limit": 200,
+            "order_by_cols": ['["period_month",false]', '["route_id",true]'],
+            "table_timestamp_format": "smart_date",
+            "show_totals": False,
+            # Explicit time column so the dashboard's Date Range native filter
+            # actually narrows this table. Without granularity_sqla, table
+            # viz in aggregate mode silently ignores __time_range__.
+            "granularity_sqla": "period_month",
+            "time_range": "No filter",
         },
     ))
 
@@ -194,11 +242,13 @@ def build_charts() -> list[ChartSpec]:
         description="Count of disruption events per type.",
         params={
             "viz_type": "dist_bar",
-            "metrics": [metric_sql(
-                "SUM(CASE WHEN disruption_type IS NOT NULL THEN 1 ELSE 0 END)",
-                "Disruption Count",
-            )],
+            "metrics": [metric_count("Disruption Count")],
             "groupby": ["disruption_type"],
+            "adhoc_filters": [{
+                "expressionType": "SQL",
+                "sqlExpression": "disruption_type IS NOT NULL",
+                "clause": "WHERE",
+            }],
             "row_limit": 15,
             "order_desc": True,
             "color_scheme": "supersetColors",
@@ -211,15 +261,20 @@ def build_charts() -> list[ChartSpec]:
     charts.append(ChartSpec(
         name="Cust · Segment & Loyalty Distribution",
         dataset="dim_customer_current",
-        viz_type="dist_bar",
+        viz_type="pivot_table_v2",
         page_tag=PAGE,
-        description="Customer base by segment AND loyalty tier (two stacked bars).",
+        description="Customer base — segment × loyalty tier matrix with row/column totals.",
         params={
-            "viz_type": "dist_bar",
+            "viz_type": "pivot_table_v2",
+            "groupbyRows": ["customer_segment"],
+            "groupbyColumns": ["loyalty_tier_safe"],
             "metrics": [metric_count("Customers")],
-            "groupby": ["customer_segment", "loyalty_tier_safe"],
-            "row_limit": 20,
-            "color_scheme": "supersetColors",
+            "aggregateFunction": "Sum",
+            "metricsLayout": "ROWS",
+            "rowTotals": True,
+            "colTotals": True,
+            "valueFormat": ",.0f",
+            "row_limit": 100,
         },
     ))
 
@@ -278,19 +333,26 @@ def build_charts() -> list[ChartSpec]:
     ))
 
     charts.append(ChartSpec(
-        name="Cust · Repeat Booking Rate",
-        dataset="fct_bookings",
+        name="Cust · Loyalty Engagement (12m)",
+        dataset="fct_loyalty_events",
         viz_type="big_number_total",
         page_tag=PAGE,
-        description="Share of bookings made by customers with ≥2 bookings — proxy of repeat behaviour.",
+        description="Brief KPI #8 — points earned per active loyalty member over the last 12 months.",
         params={
             "viz_type": "big_number_total",
             "metric": metric_sql(
-                "(COUNT(*) - COUNT(DISTINCT customer_id)) * 1.0 / NULLIF(COUNT(*), 0)",
-                "Repeat Rate",
+                "SUM(points_earned) * 1.0 / NULLIF(COUNT(DISTINCT customer_id), 0)",
+                "Points / Member",
             ),
-            "y_axis_format": ".1%",
-            "subheader": "Bookings minus uniques / bookings",
+            "adhoc_filters": [{
+                "expressionType": "SIMPLE",
+                "subject": "event_date",
+                "operator": "TEMPORAL_RANGE",
+                "comparator": "Last year",
+                "clause": "WHERE",
+            }],
+            "y_axis_format": ",.0f",
+            "subheader": "Points earned / active member / 12m (KPI #8)",
         },
     ))
 
@@ -309,10 +371,10 @@ def build_charts() -> list[ChartSpec]:
                 "SUM(CASE WHEN accepted_flag THEN 1 ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN presented_flag THEN 1 ELSE 0 END), 0)",
                 "Conversion Rate",
             )],
-            "groupby": ["offer_type"],
+            "groupby": ["loyalty_tier"],
             "adhoc_filters": [{
                 "expressionType": "SQL",
-                "sqlExpression": "offer_type IN ('upgrade_W', 'upgrade_J')",
+                "sqlExpression": "offer_type IN ('upgrade_W', 'upgrade_J') AND loyalty_tier IS NOT NULL",
                 "clause": "WHERE",
             }],
             "row_limit": 10,
@@ -398,6 +460,8 @@ def build_charts() -> list[ChartSpec]:
             ],
             "row_limit": 10,
             "order_desc": True,
+            "granularity_sqla": "period_month",
+            "time_range": "No filter",
         },
     ))
 
@@ -510,7 +574,15 @@ class SupersetClient:
         self.csrf_token = r.json()["result"]
         print("  ✓ Authenticated as admin (JWT + session cookie)")
 
-    def create_chart(self, spec: ChartSpec, dataset_id: int) -> tuple[str, int | None]:
+    def upsert_chart(self, spec: ChartSpec, dataset_id: int,
+                     existing_id: int | None) -> tuple[str, int | None]:
+        """Create a chart, or update its params/viz_type/description in place
+        when one with the same slice_name already exists.
+
+        Update-in-place is important during development: editing a ChartSpec
+        in this file and re-running should propagate to Superset, not silently
+        skip the chart because it 'already exists'.
+        """
         params_with_ds = {**spec.params, "datasource": f"{dataset_id}__table"}
         payload = {
             "slice_name": spec.name,
@@ -520,6 +592,18 @@ class SupersetClient:
             "params": json.dumps(params_with_ds),
             "description": spec.description,
         }
+
+        if existing_id is not None:
+            r = self.session.put(
+                f"{self.base_url}/api/v1/chart/{existing_id}",
+                headers=self._hdr(),
+                json=payload,
+                timeout=60,
+            )
+            if r.status_code >= 400:
+                return ("failed", None)
+            return ("updated", existing_id)
+
         r = self.session.post(
             f"{self.base_url}/api/v1/chart/",
             headers=self._hdr(),
@@ -533,8 +617,8 @@ class SupersetClient:
         return ("created", r.json().get("id"))
 
 
-def fetch_existing_chart_names() -> set[str]:
-    """Read existing slice_names from the Superset metastore via docker exec
+def fetch_existing_chart_name_to_id() -> dict[str, int]:
+    """Read {slice_name: id} from the Superset metastore via docker exec
     (Superset 4.1.2's REST list endpoint hides API-created charts by default)."""
     import subprocess
     try:
@@ -542,14 +626,25 @@ def fetch_existing_chart_names() -> set[str]:
             ["docker", "exec", "airline-superset", "python", "-c",
              "import sqlite3, json; "
              "con=sqlite3.connect('/app/superset_home/superset.db'); "
-             "print(json.dumps([r[0] for r in con.execute('SELECT slice_name FROM slices')]))"],
+             "print(json.dumps([[r[0], r[1]] for r in con.execute('SELECT id, slice_name FROM slices')]))"],
             capture_output=True, text=True, timeout=30, check=False,
         )
         if result.returncode == 0:
-            return set(json.loads(result.stdout.strip().splitlines()[-1]))
+            rows = json.loads(result.stdout.strip().splitlines()[-1])
+            return {name: id_ for (id_, name) in rows}
     except (subprocess.SubprocessError, json.JSONDecodeError, FileNotFoundError):
         pass
-    return set()
+    # In-container fallback: read sqlite directly if available at the
+    # well-known path (used by the dockerised provisioner).
+    db_path = os.environ.get("SUPERSET_DB_PATH")
+    if db_path and os.path.exists(db_path):
+        import sqlite3
+        con = sqlite3.connect(db_path)
+        try:
+            return {name: id_ for (id_, name) in con.execute("SELECT id, slice_name FROM slices")}
+        finally:
+            con.close()
+    return {}
 
 
 def main() -> int:
@@ -560,12 +655,13 @@ def main() -> int:
     charts = build_charts()
     print(f"\n>>> Charts ({len(charts)} total)")
 
-    existing_names = fetch_existing_chart_names()
-    if existing_names:
-        print(f"  (Found {len(existing_names)} existing charts in metastore — will skip duplicates)")
+    existing_name_to_id = fetch_existing_chart_name_to_id()
+    if existing_name_to_id:
+        print(f"  (Found {len(existing_name_to_id)} existing charts in metastore — "
+              f"will update params in place)")
 
     created = 0
-    existing = 0
+    updated = 0
     failed = 0
     for spec in charts:
         ds_id = DATASETS.get(spec.dataset)
@@ -573,24 +669,21 @@ def main() -> int:
             print(f"  ✗ {spec.name:<50s} UNKNOWN DATASET: {spec.dataset}")
             failed += 1
             continue
-        if spec.name in existing_names:
-            print(f"  ✓ {spec.name:<50s} (already exists, skipped)")
-            existing += 1
-            continue
-        status, chart_id = client.create_chart(spec, ds_id)
+        existing_id = existing_name_to_id.get(spec.name)
+        status, chart_id = client.upsert_chart(spec, ds_id, existing_id)
         if status == "created":
             print(f"  + {spec.name:<50s} (id={chart_id}, dataset={spec.dataset})")
             created += 1
-        elif status == "exists":
-            print(f"  ✓ {spec.name:<50s} (already exists, skipped)")
-            existing += 1
+        elif status == "updated":
+            print(f"  ~ {spec.name:<50s} (id={chart_id}, params updated)")
+            updated += 1
         else:
             print(f"  ✗ {spec.name:<50s} FAILED")
             failed += 1
 
     print(f"\n>>> Summary")
     print(f"    Created : {created}")
-    print(f"    Existing: {existing}")
+    print(f"    Updated : {updated}")
     print(f"    Failed  : {failed}")
     print(f"    Total   : {len(charts)}")
     return 0 if failed == 0 else 1

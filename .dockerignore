@@ -85,5 +85,5 @@ dashboard/superset/.docker/
 air_cote_divoire_starter_dataset.xlsx
 analytics_engineer_challenge_brief.docx.pdf
 
-# ---------- Docs (not needed in the image) ----------
-docs/screenshots/
+# ---------- docs_video_screen (not needed in the image) ----------
+docs_video_screen/screenshots/

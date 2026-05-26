@@ -9,7 +9,8 @@ bookings as (
     from {{ ref('stg_bookings') }}
 ),
 d_customer as (
-    select customer_sk, customer_id from {{ ref('dim_customer_current') }}
+    select customer_sk, customer_id, customer_segment, loyalty_tier
+    from {{ ref('dim_customer_current') }}
 ),
 d_fare as (
     select fare_sk, fare_class, fare_family from {{ ref('dim_fare') }}
@@ -24,6 +25,8 @@ select
     o.booking_id,
     dc.customer_sk,
     b.customer_id,
+    dc.customer_segment,
+    dc.loyalty_tier,
     b.flight_id,
     dfare.fare_sk,
     b.fare_class,

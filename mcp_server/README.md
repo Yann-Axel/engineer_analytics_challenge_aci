@@ -1,14 +1,13 @@
-# Air Côte d'Ivoire MCP Server
+# Air Côte d'Ivoire — MCP server
 
-Three tools that expose dbt marts + the unstructured feedback table to any
-MCP-capable AI assistant (Claude Desktop, Claude Code, etc.).
+Three tools exposing the dbt marts + unstructured feedback table to any MCP-capable AI assistant (Claude Desktop, Claude Code, …).
 
-Architecture and video script: [`docs/11_mcp_architecture.md`](../docs/11_mcp_architecture.md).
+Architecture and video script: [`docs_video_screen/11_mcp_architecture.md`](../docs_video_screen/11_mcp_architecture.md).
 
-## Prereqs
+## Prerequisites
 
 - Python 3.12 in `.venv`
-- `dbt/airline.duckdb` materialised (run `dbt build` in `dbt/` once)
+- `dbt/airline.duckdb` materialised (run `dbt build` in `../dbt/` once)
 
 ## Smoke test (end-to-end protocol check)
 
@@ -32,7 +31,7 @@ Expected: the three brief questions answered, each via a tool call.
 ```
 mcp_server/
 ├── __main__.py             python -m mcp_server  → mcp.run("stdio")
-├── server.py               FastMCP instance + the 3 tools inline
+├── server.py               FastMCP instance + the 3 tools
 ├── db.py                   read-only DuckDB connection
 ├── safety.py               safe_query() with audit envelope + row cap
 ├── smoke_test.py           end-to-end check via the real MCP protocol

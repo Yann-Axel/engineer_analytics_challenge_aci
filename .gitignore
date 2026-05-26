@@ -68,6 +68,13 @@ desktop.ini
 *.tmp
 *.bak
 
+# ---------- Screen recordings / session videos (Claude Code, OBS, etc.) ----------
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
 # ---------- Secrets ----------
 .env
 .env.local

@@ -16,6 +16,15 @@ d_customer as (
         dbt_valid_to
     from {{ ref('dim_customer_snapshot') }}
 ),
+d_customer_current as (
+    -- Fallback for bookings predating the first snapshot run.
+    -- With synthetic historical data the snapshot's dbt_valid_from is the
+    -- seed timestamp (2026-05-24), which is after every booking_date.
+    -- In production with continuous snapshotting, this fallback only fires
+    -- during the initial seed window.
+    select customer_id, loyalty_tier, customer_segment
+    from {{ ref('dim_customer_current') }}
+),
 d_route_via_flight as (
     select f.flight_id, f.route_id, dr.route_sk, f.tail_number, f.aircraft_type
     from {{ ref('stg_flights') }} f
@@ -38,8 +47,8 @@ select
     -- Point-in-time SCD2 join: pick the customer version valid at booking_date
     {{ dbt_utils.generate_surrogate_key(['dc.dbt_scd_id']) }} as customer_version_sk,
     b.customer_id,
-    dc.loyalty_tier   as loyalty_tier_at_booking,
-    dc.customer_segment as customer_segment_at_booking,
+    coalesce(dc.loyalty_tier,     dcc.loyalty_tier)     as loyalty_tier_at_booking,
+    coalesce(dc.customer_segment, dcc.customer_segment) as customer_segment_at_booking,
     df.flight_sk,
     b.flight_id,
     dr.route_sk,
@@ -67,6 +76,7 @@ left join d_customer         dc       on b.customer_id = dc.customer_id
                                        and b.booking_date >= cast(dc.dbt_valid_from as date)
                                        and (dc.dbt_valid_to is null
                                             or b.booking_date < cast(dc.dbt_valid_to as date))
+left join d_customer_current dcc      on b.customer_id = dcc.customer_id
 left join d_route_via_flight dr       on b.flight_id    = dr.flight_id
 left join d_flight           df       on b.flight_id    = df.flight_id
 left join d_fare             dfare    on b.fare_class   = dfare.fare_class

@@ -71,12 +71,18 @@ DASHBOARDS: list[DashboardSpec] = [
         slug="network-profitability",
         chart_names=[
             "Net · Revenue by Route", "Net · Route Opportunity Matrix",
+            "Net · Route KPI Drilldown",
             "Net · OTP15 & Cancellation Trends",
             "Net · Yield (RASK) by Route Type",
             "Net · Disruptions by Type",
         ],
         rows_layout=[
-            ("one_col", ["Net · Route Opportunity Matrix"]),  # hero chart full-width
+            # Hero matrix at the top — click a bubble to drill all charts
+            # below down to that route (cross-filter behaviour).
+            ("one_col", ["Net · Route Opportunity Matrix"]),
+            # KPI drilldown table — appears directly below the matrix so the
+            # selected route's monthly KPI history is one glance away.
+            ("one_col", ["Net · Route KPI Drilldown"]),
             ("two_col", ["Net · Revenue by Route", "Net · Disruptions by Type"]),
             ("two_col", ["Net · OTP15 & Cancellation Trends", "Net · Yield (RASK) by Route Type"]),
         ],
@@ -89,10 +95,10 @@ DASHBOARDS: list[DashboardSpec] = [
             "Cust · High-Value At-Risk Customers (top 20)",
             "Cust · Complaint Themes by Route",
             "Cust · Sentiment Trend (monthly)",
-            "Cust · Repeat Booking Rate",
+            "Cust · Loyalty Engagement (12m)",
         ],
         rows_layout=[
-            ("two_col", ["Cust · Segment & Loyalty Distribution", "Cust · Repeat Booking Rate"]),
+            ("two_col", ["Cust · Segment & Loyalty Distribution", "Cust · Loyalty Engagement (12m)"]),
             ("one_col", ["Cust · High-Value At-Risk Customers (top 20)"]),
             ("two_col", ["Cust · Complaint Themes by Route", "Cust · Sentiment Trend (monthly)"]),
         ],
@@ -190,43 +196,107 @@ def build_position_json(rows_layout: list[tuple[str, list[str]]],
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Native filter: shared time-range filter for all dashboards
+# Native filters + cross-filtering metadata (per-dashboard)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_native_filter() -> dict:
-    """One shared time-range filter applied to all dashboards.
+# Dataset ID for int_route_monthly_perf — must match setup_charts.py's DATASETS.
+ROUTE_PERF_DATASET_ID = 12
+
+
+def _time_range_filter() -> dict:
+    """Shared time-range native filter applied to every dashboard.
     The full schema (scope.excluded, controlValues, defaultDataMask…) is
     required by Superset 4.1.2's front-end — any missing key crashes the
     React tree with "Cannot read properties of undefined (reading 'excluded')".
+
+    Default value covers the full synthetic data range (2024-01 → 2025-12) so
+    first-load users see populated charts. Relative ranges like "Last month"
+    can return empty on this dataset because the data is bounded — surfaced
+    in the filter description.
     """
+    default_range = "2024-01-01T00:00:00 : 2026-01-01T00:00:00"
     return {
-        "native_filter_configuration": [
-            {
-                "id": "NATIVE_FILTER-time-range",
-                "name": "Date Range",
-                "filterType": "filter_time",
-                "targets": [{}],
-                "controlValues": {
-                    "enableEmptyFilter": False,
-                    "defaultToFirstItem": False,
-                    "multiple": True,
-                    "searchAllOptions": False,
-                    "inverseSelection": False,
-                },
-                "defaultDataMask": {
-                    "filterState": {"value": "No filter"},
-                    "extraFormData": {},
-                },
-                "scope": {
-                    "rootPath": ["ROOT_ID"],
-                    "excluded": [],
-                },
-                "type": "NATIVE_FILTER",
-                "description": "Limit all charts to a date range.",
-                "chartsInScope": [],
-            }
-        ],
+        "id": "NATIVE_FILTER-time-range",
+        "name": "Date Range",
+        "filterType": "filter_time",
+        "targets": [{}],
+        "controlValues": {
+            "enableEmptyFilter": False,
+            "defaultToFirstItem": False,
+            "multiple": True,
+            "searchAllOptions": False,
+            "inverseSelection": False,
+        },
+        "defaultDataMask": {
+            "filterState": {"value": default_range},
+            "extraFormData": {"time_range": default_range},
+        },
+        "scope": {
+            "rootPath": ["ROOT_ID"],
+            "excluded": [],
+        },
+        "type": "NATIVE_FILTER",
+        "description": (
+            "Limit all charts to a date range. "
+            "Synthetic data spans 2024-01 to 2025-12 — picking a range outside "
+            "those bounds (e.g. 'Last month' if today is past 2025) will return "
+            "empty charts. Default covers the full range."
+        ),
+        "chartsInScope": [],
+    }
+
+
+def _route_id_filter() -> dict:
+    """Dropdown filter on route_id. Bound to int_route_monthly_perf but
+    propagated to every chart on the dashboard whose dataset exposes a
+    column named `route_id` (Superset matches the target column name)."""
+    return {
+        "id": "NATIVE_FILTER-route-id",
+        "name": "Route",
+        "filterType": "filter_select",
+        "targets": [{
+            "datasetId": ROUTE_PERF_DATASET_ID,
+            "column": {"name": "route_id"},
+        }],
+        "controlValues": {
+            "enableEmptyFilter": False,
+            "defaultToFirstItem": False,
+            "multiple": True,
+            "searchAllOptions": False,
+            "inverseSelection": False,
+        },
+        "defaultDataMask": {
+            "filterState": {},
+            "extraFormData": {},
+        },
+        "scope": {
+            "rootPath": ["ROOT_ID"],
+            "excluded": [],
+        },
+        "type": "NATIVE_FILTER",
+        "description": "Filter every route-aware chart on this page to one or more routes.",
+        "chartsInScope": [],
+    }
+
+
+def build_native_filter(slug: str) -> dict:
+    """json_metadata for a dashboard.
+
+    Every dashboard gets the shared Date Range filter and cross-filtering
+    enabled (clicking a data point filters the rest of the dashboard).
+    The network-profitability page additionally exposes a Route dropdown
+    so a route can be selected explicitly without clicking the matrix.
+    """
+    filters = [_time_range_filter()]
+    if slug == "network-profitability":
+        filters.append(_route_id_filter())
+    return {
+        "native_filter_configuration": filters,
         "global_chart_configuration": {},
+        # Dashboard-wide cross-filtering: clicking a bubble on the Route
+        # Opportunity Matrix (or any data point on any chart) emits a filter
+        # on its dimension to every other chart on the page.
+        "cross_filters_enabled": True,
     }
 
 
@@ -414,9 +484,11 @@ def main() -> int:
                 attached += 1
         # 2) Build layout (position_json) and apply.
         position_json = build_position_json(spec.rows_layout, name_to_id)
-        json_metadata = build_native_filter()
+        json_metadata = build_native_filter(spec.slug)
+        filter_count = len(json_metadata["native_filter_configuration"])
         if client.update_dashboard(dash_id, position_json, json_metadata):
-            print(f"      ↳ {attached} charts attached + grid layout + global time-range filter")
+            print(f"      ↳ {attached} charts attached + grid layout + "
+                  f"{filter_count} native filter(s) + cross-filtering ON")
             updated += 1
         else:
             failed += 1

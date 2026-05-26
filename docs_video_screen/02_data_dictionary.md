@@ -1,26 +1,35 @@
 # Data dictionary — `data/enriched/` reference
 
-Column-level reference for every parquet the Part-2 dbt project consumes. Reference doc, not a Part-1 deliverable (assumptions live in [03_assumptions.md](03_assumptions.md)).
+Column-level reference for every parquet consumed by the Part-2 dbt project. This is a reference doc, not a Part-1 deliverable (assumptions live in [03_assumptions.md](03_assumptions.md)).
 
-**Layering**: `data/raw/` (immutable starter Excel) → `data/enriched/` (this doc) → dbt staging (rename + cast).
+**Data layering:** `data/raw/` (immutable starter Excel) → `data/enriched/` (this doc) → dbt staging (cast + rename).
 
-## Source overview (entities & foreign keys)
+## Source overview
 
 ```mermaid
 erDiagram
+    %% Geo backbone
     airports        ||--o{ routes             : "origin / destination"
+    airports        ||--o{ weather_daily      : "weather"
+
+    %% Network & fleet → flights
     routes          ||--o{ flights            : "operated as"
+    routes          ||--o{ competitors        : "benchmark"
     aircraft        ||--o{ flights            : "tail"
+
+    %% Flight-level facts
     flights         ||--|| flight_costs       : "1:1 cost"
     flights         ||--o{ disruptions        : "may have"
-    flights         ||--o{ bookings           : "carries"
     flights         ||--o{ cargo_shipments    : "carries (widebody)"
+
+    %% Commercial chain
+    flights         ||--o{ bookings           : "carries"
+    bookings        ||--o{ ancillary_offers   : "presented"
+
+    %% Customer activity
     customers       ||--o{ bookings           : "makes"
     customers       ||--o{ loyalty_activity   : "earns / redeems"
     customers       ||--o{ customer_feedback  : "writes (FR/EN text)"
-    bookings        ||--o{ ancillary_offers   : "presented"
-    routes          ||--o{ competitors        : "benchmark"
-    airports        ||--o{ weather_daily      : "weather"
 ```
 
 ## Reference / dimensions
@@ -43,24 +52,24 @@ erDiagram
 | `route_type`                                      | str  | Domestic / Regional / International                      |
 | `distance_km`, `block_time_min`                   | int  | Stage length & block time                                |
 | `route_status`                                    | str  | `operated` or `candidate` (potential new launches)       |
-| `is_strategic`                                    | bool | Flagged strategic for long-haul ambition / hub feed      |
+| `is_strategic`                                    | bool | Strategic for long-haul ambition / hub feed              |
 
 ### `aircraft.parquet` (9 tails)
 
-| Column                                                                | Type    | Description                                  |
-| :-------------------------------------------------------------------- | :------ | :------------------------------------------- |
-| `tail_number`                                                         | str     | TU-TSx (synthetic)                           |
-| `aircraft_type`                                                       | str     | A319 / A320 / A320neo / A330-900neo          |
-| `manufacturer`, `build_year`, `fleet_status`                          | str/int | Owned vs Leased                              |
-| `seats_business`, `seats_premium_eco`, `seats_economy`, `total_seats` | int     | Cabin configuration                          |
-| `typed_capacity`                                                      | int     | Canonical capacity per type (sanity vs `total_seats`) |
+| Column                                                                | Type    | Description                                          |
+| :-------------------------------------------------------------------- | :------ | :--------------------------------------------------- |
+| `tail_number`                                                         | str     | TU-TSx (synthetic)                                   |
+| `aircraft_type`                                                       | str     | A319 / A320 / A320neo / A330-900neo                  |
+| `manufacturer`, `build_year`, `fleet_status`                          | str/int | Owned vs Leased                                      |
+| `seats_business`, `seats_premium_eco`, `seats_economy`, `total_seats` | int     | Cabin configuration                                  |
+| `typed_capacity`                                                      | int     | Canonical capacity per type (sanity vs `total_seats`)|
 
 ### `customers.parquet` (1,000 rows)
 
 | Column                                       | Type     | Description                                       |
 | :------------------------------------------- | :------- | :------------------------------------------------ |
 | `customer_id`                                | str      | CUST0001..CUST1000 (starter 300 + 700 new)        |
-| `first_name`, `last_name`, `gender`          | str      | PII synthetic                                     |
+| `first_name`, `last_name`, `gender`          | str      | PII (synthetic)                                   |
 | `birth_date`, `signup_date`                  | datetime |                                                   |
 | `country`, `city`, `preferred_channel`       | str      |                                                   |
 | `customer_segment`                           | str      | Budget / Standard / Business / Premium            |
@@ -72,7 +81,7 @@ Internal bookkeeping for booking generation. **Not exposed in the semantic layer
 
 ## Facts
 
-### `flights.parquet` (~8,750 rows; 24 months)
+### `flights.parquet` (~8,750 rows, 24 months)
 
 | Column                                                                              | Type     | Description                          |
 | :---------------------------------------------------------------------------------- | :------- | :----------------------------------- |
@@ -83,7 +92,7 @@ Internal bookkeeping for booking generation. **Not exposed in the semantic layer
 | `flight_status`                                                                     | str      | On Time / Delayed / Cancelled        |
 | `delay_min`                                                                         | int      | Departure delay (NaN for cancelled)  |
 
-### `bookings.parquet` (~1.1M rows)
+### `bookings.parquet` (~1.1 M rows)
 
 | Column                                          | Type     | Description                                          |
 | :---------------------------------------------- | :------- | :--------------------------------------------------- |
@@ -117,25 +126,25 @@ Internal bookkeeping for booking generation. **Not exposed in the semantic layer
 | `duration_min`               | int  | Delay attributed to the disruption                   |
 | `root_cause_text`            | str  | **Free-text** (FR/EN) — additional NLP candidate     |
 
-### `loyalty_activity.parquet` (~650k rows)
+### `loyalty_activity.parquet` (~650 k rows)
 
-| Column                                                  | Type     | Description                                |
-| :------------------------------------------------------ | :------- | :----------------------------------------- |
-| `loyalty_event_id`, `customer_id`, `flight_id`, `route_id` | str   |                                            |
-| `tier_at_event`                                         | str      | Tier when event occurred (SCD2 input)      |
-| `event_type`                                            | str      | earn / redeem                              |
-| `points_delta`                                          | int      | Positive for earn, negative for redeem     |
-| `event_date`                                            | datetime |                                            |
+| Column                                                     | Type     | Description                                |
+| :--------------------------------------------------------- | :------- | :----------------------------------------- |
+| `loyalty_event_id`, `customer_id`, `flight_id`, `route_id` | str      |                                            |
+| `tier_at_event`                                            | str      | Tier when event occurred (SCD2 input)      |
+| `event_type`                                               | str      | earn / redeem                              |
+| `points_delta`                                             | int      | Positive for earn, negative for redeem     |
+| `event_date`                                               | datetime |                                            |
 
-### `ancillary_offers.parquet` (~3.3M rows)
+### `ancillary_offers.parquet` (~3.3 M rows)
 
-| Column                              | Type     | Description                                                                  |
-| :---------------------------------- | :------- | :--------------------------------------------------------------------------- |
-| `ancillary_offer_id`, `booking_id`  | str      |                                                                              |
-| `offer_type`                        | str      | seat_selection / extra_bag / upgrade_W / upgrade_J / lounge_access / priority_board |
-| `offer_price_usd`                   | float    |                                                                              |
-| `presented_flag`, `accepted_flag`   | bool     |                                                                              |
-| `offer_date`                        | datetime |                                                                              |
+| Column                              | Type     | Description                                                                            |
+| :---------------------------------- | :------- | :------------------------------------------------------------------------------------- |
+| `ancillary_offer_id`, `booking_id`  | str      |                                                                                        |
+| `offer_type`                        | str      | seat_selection / extra_bag / upgrade_W / upgrade_J / lounge_access / priority_board    |
+| `offer_price_usd`                   | float    |                                                                                        |
+| `presented_flag`, `accepted_flag`   | bool     |                                                                                        |
+| `offer_date`                        | datetime |                                                                                        |
 
 ### `cargo_shipments.parquet` (~5,600 rows)
 
@@ -152,10 +161,10 @@ Long-haul / widebody only. Used for cargo revenue per flight.
 
 Monthly competitor benchmark per route.
 
-| Column                                          | Type     | Description |
-| :---------------------------------------------- | :------- | :---------- |
-| `route_id`, `competitor_name`, `snapshot_month` | str/date |             |
-| `avg_fare_usd`, `weekly_frequency`               | float/int |            |
+| Column                                          | Type      | Description |
+| :---------------------------------------------- | :-------- | :---------- |
+| `route_id`, `competitor_name`, `snapshot_month` | str/date  |             |
+| `avg_fare_usd`, `weekly_frequency`              | float/int |             |
 
 ### `weather_daily.parquet` (~9,500 rows)
 
@@ -169,12 +178,12 @@ Monthly competitor benchmark per route.
 
 ### `customer_feedback.parquet` (3,000 rows)
 
-**Free-text, bilingual (FR/EN, ~5% code-switched).** Sentiment, complaint category, and route-issue theme are **not** stored here — they will be derived by the dbt staging NLP step in Part 2.
+**Free-text, bilingual (FR 65 % / EN 30 % / mixed 5 %).** Sentiment, complaint category and route-issue theme are *deliberately not stored here* — they are derived by the Part-2 dbt NLP pipeline.
 
-| Column                                                            | Type     | Description                                |
-| :---------------------------------------------------------------- | :------- | :----------------------------------------- |
-| `feedback_id`, `customer_id`, `booking_id`, `flight_id`, `route_id` | str    |                                            |
-| `feedback_channel`                                                | str      | support_ticket / review / social_post      |
-| `feedback_date`                                                   | datetime |                                            |
-| `language`                                                        | str      | fr / en / fr+en                            |
-| `raw_text`                                                        | str      | Free text                                  |
+| Column                                                              | Type     | Description                                |
+| :------------------------------------------------------------------ | :------- | :----------------------------------------- |
+| `feedback_id`, `customer_id`, `booking_id`, `flight_id`, `route_id` | str      |                                            |
+| `feedback_channel`                                                  | str      | support_ticket / review / social_post      |
+| `feedback_date`                                                     | datetime |                                            |
+| `language`                                                          | str      | fr / en / fr+en                            |
+| `raw_text`                                                          | str      | Free text                                  |

@@ -12,7 +12,6 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).resolve().parent
 
 STEPS = [
-    "00_extract_starter_to_raw.py",
     "10_generate_fleet_and_network.py",
     "11_generate_flights.py",
     "12_generate_bookings.py",

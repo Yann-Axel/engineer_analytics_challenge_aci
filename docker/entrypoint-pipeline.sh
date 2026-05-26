@@ -15,7 +15,7 @@ echo "================================================================"
 # is mounted into the container we re-extract data/raw/. Otherwise we trust
 # the committed data/raw/*.parquet and skip step 00.
 if [ -f /app/air_cote_divoire_starter_dataset.xlsx ]; then
-    echo ">>> Starter Excel detected — running full pipeline (00 → 15)"
+    echo ">>> Starter Excel detected — running full pipeline (10 → 15)"
     python scripts/run_all.py
 else
     echo ">>> No starter Excel — using committed data/raw/ (skipping step 00)"
