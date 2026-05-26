@@ -189,7 +189,7 @@ flowchart TB
     B --> C[int_feedback_tokens]
 
     %% Three parallel NLP enrichments
-    C --> D[int_feedback_sentiment<br/>lexicon score [-1,+1]<br/>+ 2-token negation window]
+    C --> D[int_feedback_sentiment<br/>lexicon score (-1,+1)<br/>+ 2-token negation window]
     C --> E[int_feedback_category<br/>taxonomy]
     C --> F[int_feedback_tags]
 
